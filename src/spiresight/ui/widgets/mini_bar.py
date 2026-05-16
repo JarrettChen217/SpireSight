@@ -22,6 +22,7 @@ class MiniBar(QWidget):
         super().__init__(parent, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         self._drag_offset: QPoint | None = None
+        self._pinned = True
 
         row = QHBoxLayout(self)
         row.setContentsMargins(10, 6, 10, 6)
@@ -50,11 +51,12 @@ class MiniBar(QWidget):
         row.addWidget(expand)
 
     def _toggle_pin(self) -> None:
+        self._pinned = not self._pinned
         flags = self.windowFlags()
-        if flags & Qt.WindowType.WindowStaysOnTopHint:
-            flags &= ~Qt.WindowType.WindowStaysOnTopHint
-        else:
+        if self._pinned:
             flags |= Qt.WindowType.WindowStaysOnTopHint
+        else:
+            flags &= ~Qt.WindowType.WindowStaysOnTopHint
         handle = self.windowHandle()
         if handle is not None:
             handle.setFlags(flags)
@@ -63,8 +65,7 @@ class MiniBar(QWidget):
         self._update_pin_icon()
 
     def _update_pin_icon(self) -> None:
-        on_top = bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
-        icon_name = "pin_filled" if on_top else "pin_outline"
+        icon_name = "pin_filled" if self._pinned else "pin_outline"
         self._pin_btn.setIcon(QIcon(icon_path(icon_name)))
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
