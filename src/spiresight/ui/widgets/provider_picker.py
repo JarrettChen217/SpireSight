@@ -34,9 +34,13 @@ class ProviderPicker(QWidget):
         model_row.addWidget(self._model_box, stretch=1)
         model_row.addWidget(self._badge)
 
-        layout.addWidget(QLabel("Provider"))
+        provider_lbl = QLabel("Provider")
+        provider_lbl.setProperty("role", "section-header")
+        model_lbl = QLabel("Model")
+        model_lbl.setProperty("role", "section-header")
+        layout.addWidget(provider_lbl)
         layout.addWidget(self._provider_box)
-        layout.addWidget(QLabel("Model"))
+        layout.addWidget(model_lbl)
         layout.addLayout(model_row)
 
         self._provider_box.currentIndexChanged.connect(self._reload_models)

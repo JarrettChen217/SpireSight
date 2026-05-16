@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QCheckBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QPlainTextEdit, QPushButton, QStatusBar, QVBoxLayout, QWidget,
@@ -26,6 +27,7 @@ from spiresight.llm.errors import (
     AuthError, MissingAPIKey, MissingCapabilityError, NetworkError, RateLimitError,
 )
 from spiresight.prompts.loader import PromptLoader
+from spiresight.ui.theme import icon_path
 from spiresight.ui.widgets.mini_bar import MiniBar
 from spiresight.ui.widgets.output_view import OutputView
 from spiresight.ui.widgets.prompt_panel import PromptPanel
@@ -62,6 +64,7 @@ class MainWindow(QMainWindow):
         self._prompt_panel.action_clicked.connect(self._on_action)
 
         sidebar = QWidget()
+        sidebar.setObjectName("sidebar")
         sb_layout = QVBoxLayout(sidebar)
         sb_layout.setContentsMargins(12, 12, 12, 12)
         sb_layout.addWidget(self._picker)
@@ -70,7 +73,22 @@ class MainWindow(QMainWindow):
         sb_layout.addStretch(1)
         sidebar.setFixedWidth(240)
 
-        # right pane
+        # right pane header — pin button in top-right corner
+        self._pin_btn = QPushButton()
+        self._pin_btn.setCheckable(True)
+        self._pin_btn.setObjectName("corner-pin")
+        self._pin_btn.setChecked(config.always_on_top)
+        self._pin_btn.setIconSize(QSize(18, 18))
+        self._pin_btn.setToolTip("Always on top")
+        self._pin_btn.setFixedSize(28, 28)
+        self._pin_btn.clicked.connect(self._toggle_pin)
+        self._update_pin_icon()
+
+        pin_row = QHBoxLayout()
+        pin_row.setContentsMargins(0, 0, 0, 0)
+        pin_row.addStretch(1)
+        pin_row.addWidget(self._pin_btn)
+
         self._custom_text = QPlainTextEdit()
         self._custom_text.setPlaceholderText("Optional context for this query…")
         self._custom_text.setMaximumHeight(80)
@@ -96,7 +114,8 @@ class MainWindow(QMainWindow):
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(12, 12, 12, 12)
+        right_layout.setContentsMargins(12, 8, 8, 12)
+        right_layout.addLayout(pin_row)
         right_layout.addWidget(QLabel("Custom (optional)"))
         right_layout.addWidget(self._custom_text)
         right_layout.addLayout(controls)
@@ -119,6 +138,18 @@ class MainWindow(QMainWindow):
         self.setStatusBar(QStatusBar())
 
     # ─── lifecycle helpers ───────────────────────────────────────
+
+    def _toggle_pin(self) -> None:
+        pinned = self._pin_btn.isChecked()
+        self._config.always_on_top = pinned
+        self._store.save(self._config)
+        self._apply_always_on_top()
+        self._update_pin_icon()
+        self.show()
+
+    def _update_pin_icon(self) -> None:
+        icon_name = "pin_filled" if self._config.always_on_top else "pin_outline"
+        self._pin_btn.setIcon(QIcon(icon_path(icon_name)))
 
     def _apply_always_on_top(self) -> None:
         flags = self.windowFlags()
