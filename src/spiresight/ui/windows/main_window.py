@@ -21,19 +21,24 @@ from spiresight.capture.screen import ScreenCapture
 from spiresight.config.schema import AppConfig
 from spiresight.config.store import ConfigStore
 from spiresight.core.request import InferenceRequest
+from spiresight.core.run_state import RunState
 from spiresight.core.runner import InferenceRunner
 from spiresight.llm import registry
+from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import (
     AuthError, MissingAPIKey, MissingCapabilityError, NetworkError, RateLimitError,
 )
 from spiresight.prompts.loader import PromptLoader
+from spiresight.ui.state.run_state_store import RunStateStore
 from spiresight.ui.theme import icon_path
 from spiresight.ui.widgets.mini_bar import MiniBar
 from spiresight.ui.widgets.output_view import OutputView
 from spiresight.ui.widgets.prompt_panel import PromptPanel
 from spiresight.ui.widgets.provider_picker import ProviderPicker
+from spiresight.ui.widgets.run_state_panel import RunStatePanel
 from spiresight.ui.windows.settings_dialog import SettingsDialog
 from spiresight.ui.workers.inference_worker import InferenceWorker
+from spiresight.ui.workers.inspect_worker import InspectWorker
 
 
 class MainWindow(QMainWindow):
@@ -43,13 +48,15 @@ class MainWindow(QMainWindow):
     def __init__(self, config: AppConfig, store: ConfigStore, loader: PromptLoader) -> None:
         super().__init__()
         self.setWindowTitle("SpireSight")
-        self.resize(880, 520)
+        self.resize(980, 580)
         self._config = config
         self._store = store
         self._loader = loader
         self._capture = ScreenCapture()
         self._worker: InferenceWorker | None = None
         self._mini_bar: MiniBar | None = None
+        self._run_state_store = RunStateStore(self)
+        self._inspect_worker: InspectWorker | None = None
 
         self.fire_action_signal.connect(self.fire_last_action)
 
@@ -70,8 +77,12 @@ class MainWindow(QMainWindow):
         sb_layout.addWidget(self._picker)
         sb_layout.addSpacing(12)
         sb_layout.addWidget(self._prompt_panel)
-        sb_layout.addStretch(1)
-        sidebar.setFixedWidth(240)
+        sb_layout.addSpacing(12)
+        self._run_state_panel = RunStatePanel(self._run_state_store, parent=self)
+        self._run_state_panel.inspect_requested.connect(self._on_inspect_requested)
+        self._run_state_panel.clear_requested.connect(self._run_state_store.clear)
+        sb_layout.addWidget(self._run_state_panel, stretch=1)
+        sidebar.setFixedWidth(280)
 
         # right pane header — pin + mini-mode buttons in top-right corner
         self._pin_btn = QPushButton()
@@ -145,6 +156,7 @@ class MainWindow(QMainWindow):
         menu.addAction("Quit", self.close)
 
         self.setStatusBar(QStatusBar())
+        self._refresh_inspect_availability()
 
     # ─── lifecycle helpers ───────────────────────────────────────
 
@@ -177,6 +189,7 @@ class MainWindow(QMainWindow):
         if model_id:
             self._config.active_model = model_id
         self._store.save(self._config)
+        self._refresh_inspect_availability()
 
     def _open_settings(self) -> None:
         dlg = SettingsDialog(self._config, self)
@@ -238,6 +251,7 @@ class MainWindow(QMainWindow):
             prompt_loader=self._loader,
             provider_factory=registry.get,
             screen_capture=self._capture,
+            run_state_store=self._run_state_store,
         )
         request = InferenceRequest(
             prompt_id=action_id,
@@ -289,3 +303,68 @@ class MainWindow(QMainWindow):
     def _reset_buttons(self) -> None:
         self._send_btn.setEnabled(True)
         self._cancel_btn.setEnabled(False)
+
+    # ─── inspect flow ────────────────────────────────────────────
+
+    def _on_inspect_requested(self) -> None:
+        if self._inspect_worker is not None and self._inspect_worker.isRunning():
+            return
+        runner = InferenceRunner(
+            config=self._config,
+            prompt_loader=self._loader,
+            provider_factory=registry.get,
+            screen_capture=self._capture,
+            run_state_store=self._run_state_store,
+        )
+        self._run_state_panel.set_inspect_enabled(False, "Inspecting…")
+        self.statusBar().showMessage("Inspecting run state…")
+
+        self._inspect_worker = InspectWorker(runner, self)
+        self._inspect_worker.ready.connect(self._on_inspect_ready)
+        self._inspect_worker.failed.connect(self._on_inspect_failed)
+        self._inspect_worker.start()
+
+    def _on_inspect_ready(self, state: RunState) -> None:
+        self._run_state_store.set(state)
+        self._run_state_panel.set_inspect_enabled(True)
+        self.statusBar().showMessage("Run state captured.", 3000)
+
+    def _on_inspect_failed(self, exc: Exception) -> None:
+        self._run_state_panel.set_inspect_enabled(True)
+        if isinstance(exc, MissingCapabilityError):
+            missing = ", ".join(sorted(c.value for c in exc.missing))
+            self.statusBar().showMessage(
+                f"Inspect needs {missing} — switch model.", 8000)
+        elif isinstance(exc, ValueError):
+            self.statusBar().showMessage(
+                "Inspect failed: malformed response, try again.", 8000)
+        else:
+            self.statusBar().showMessage(f"Inspect failed: {exc}", 8000)
+
+    def _refresh_inspect_availability(self) -> None:
+        try:
+            provider_cfg = self._config.providers.get(self._config.active_provider)
+            if provider_cfg is None:
+                self._run_state_panel.set_inspect_enabled(
+                    False, "Configure a provider first."
+                )
+                return
+            provider = registry.get(self._config.active_provider, provider_cfg)
+            model = next(
+                (m for m in provider.list_models()
+                 if m.id == self._config.active_model), None
+            )
+            if model is None:
+                self._run_state_panel.set_inspect_enabled(False, "Select a model.")
+                return
+            needed = {Capability.VISION, Capability.JSON_MODE}
+            missing = needed - set(model.capabilities)
+            if missing:
+                names = ", ".join(sorted(c.value for c in missing))
+                self._run_state_panel.set_inspect_enabled(
+                    False, f"Active model lacks {names}."
+                )
+            else:
+                self._run_state_panel.set_inspect_enabled(True)
+        except Exception:  # noqa: BLE001
+            self._run_state_panel.set_inspect_enabled(True)
