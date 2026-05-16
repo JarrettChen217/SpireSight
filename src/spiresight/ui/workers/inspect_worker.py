@@ -12,9 +12,15 @@ class InspectWorker(QThread):
     ready = Signal(object)   # RunState
     failed = Signal(object)  # Exception
 
-    def __init__(self, runner: InferenceRunner, parent=None) -> None:
+    def __init__(
+        self,
+        runner: InferenceRunner,
+        frames: list[bytes],
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self._runner = runner
+        self._frames = list(frames)  # defensive copy; session may mutate later
         self._cancel = threading.Event()
 
     def cancel(self) -> None:
@@ -22,7 +28,9 @@ class InspectWorker(QThread):
 
     def run(self) -> None:
         try:
-            state: RunState = self._runner.inspect(cancel_event=self._cancel)
+            state: RunState = self._runner.inspect(
+                images=self._frames, cancel_event=self._cancel
+            )
             self.ready.emit(state)
         except Exception as exc:  # noqa: BLE001
             self.failed.emit(exc)
