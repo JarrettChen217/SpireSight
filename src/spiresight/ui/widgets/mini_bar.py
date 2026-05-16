@@ -18,11 +18,15 @@ class MiniBar(QWidget):
     action_clicked = Signal(str)
     expand_requested = Signal()
 
-    def __init__(self, loader: PromptLoader, hotkey_hint: str, parent=None) -> None:
-        super().__init__(parent, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+    def __init__(self, loader: PromptLoader, hotkey_hint: str, *,
+                 pinned: bool = True, parent=None) -> None:
+        flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool
+        if pinned:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        super().__init__(parent, flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         self._drag_offset: QPoint | None = None
-        self._pinned = True
+        self._pinned = pinned
 
         row = QHBoxLayout(self)
         row.setContentsMargins(10, 6, 10, 6)
@@ -37,7 +41,7 @@ class MiniBar(QWidget):
 
         self._pin_btn = QPushButton()
         self._pin_btn.setCheckable(True)
-        self._pin_btn.setChecked(True)
+        self._pin_btn.setChecked(pinned)
         self._pin_btn.setIconSize(QSize(18, 18))
         self._pin_btn.setToolTip("Always on top")
         self._pin_btn.setFixedSize(28, 24)
@@ -50,18 +54,21 @@ class MiniBar(QWidget):
         expand.clicked.connect(self.expand_requested.emit)
         row.addWidget(expand)
 
+    @property
+    def is_pinned(self) -> bool:
+        return self._pinned
+
     def _toggle_pin(self) -> None:
         self._pinned = not self._pinned
+        geo = self.geometry()
         flags = self.windowFlags()
         if self._pinned:
             flags |= Qt.WindowType.WindowStaysOnTopHint
         else:
             flags &= ~Qt.WindowType.WindowStaysOnTopHint
-        handle = self.windowHandle()
-        if handle is not None:
-            handle.setFlags(flags)
-        else:
-            self.setWindowFlags(flags)
+        self.setWindowFlags(flags)
+        self.setGeometry(geo)
+        self.show()
         self._update_pin_icon()
 
     def _update_pin_icon(self) -> None:

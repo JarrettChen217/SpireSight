@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
         sb_layout.addStretch(1)
         sidebar.setFixedWidth(240)
 
-        # right pane header — pin button in top-right corner
+        # right pane header — pin + mini-mode buttons in top-right corner
         self._pin_btn = QPushButton()
         self._pin_btn.setCheckable(True)
         self._pin_btn.setObjectName("corner-pin")
@@ -84,9 +84,18 @@ class MainWindow(QMainWindow):
         self._pin_btn.clicked.connect(self._toggle_pin)
         self._update_pin_icon()
 
+        self._mini_mode_btn = QPushButton()
+        self._mini_mode_btn.setObjectName("corner-pin")
+        self._mini_mode_btn.setIcon(QIcon(icon_path("mini_mode")))
+        self._mini_mode_btn.setIconSize(QSize(18, 18))
+        self._mini_mode_btn.setToolTip("Switch to mini-bar mode")
+        self._mini_mode_btn.setFixedSize(28, 28)
+        self._mini_mode_btn.clicked.connect(self._toggle_mini_bar)
+
         pin_row = QHBoxLayout()
         pin_row.setContentsMargins(0, 0, 0, 0)
         pin_row.addStretch(1)
+        pin_row.addWidget(self._mini_mode_btn)
         pin_row.addWidget(self._pin_btn)
 
         self._custom_text = QPlainTextEdit()
@@ -151,15 +160,15 @@ class MainWindow(QMainWindow):
         self._pin_btn.setIcon(QIcon(icon_path(icon_name)))
 
     def _apply_always_on_top(self) -> None:
-        flags = self.windowFlags()
-        if self._config.always_on_top:
-            flags |= Qt.WindowType.WindowStaysOnTopHint
-        else:
-            flags &= ~Qt.WindowType.WindowStaysOnTopHint
         handle = self.windowHandle()
         if handle is not None:
-            handle.setFlags(flags)
+            handle.setFlag(Qt.WindowType.WindowStaysOnTopHint, self._config.always_on_top)
         else:
+            flags = self.windowFlags()
+            if self._config.always_on_top:
+                flags |= Qt.WindowType.WindowStaysOnTopHint
+            else:
+                flags &= ~Qt.WindowType.WindowStaysOnTopHint
             self.setWindowFlags(flags)
 
     def _on_picker_changed(self, provider: str, model_id: str) -> None:
@@ -180,9 +189,12 @@ class MainWindow(QMainWindow):
 
     def _toggle_mini_bar(self) -> None:
         if self._mini_bar is None:
-            self._mini_bar = MiniBar(self._loader, hotkey_hint=self._config.hotkey)
+            self._mini_bar = MiniBar(self._loader, hotkey_hint=self._config.hotkey,
+                                      pinned=self._config.always_on_top)
             self._mini_bar.action_clicked.connect(self._on_action)
             self._mini_bar.expand_requested.connect(self._exit_mini_bar)
+        elif self._mini_bar.is_pinned != self._config.always_on_top:
+            self._mini_bar._toggle_pin()
         self.hide()
         self._mini_bar.show()
         self._config.mini_bar_mode = True
@@ -190,6 +202,11 @@ class MainWindow(QMainWindow):
 
     def _exit_mini_bar(self) -> None:
         if self._mini_bar is not None:
+            self._config.always_on_top = self._mini_bar.is_pinned
+            self._store.save(self._config)
+            self._apply_always_on_top()
+            self._update_pin_icon()
+            self._pin_btn.setChecked(self._config.always_on_top)
             self._mini_bar.hide()
         self.show()
         self._config.mini_bar_mode = False
