@@ -29,6 +29,7 @@ from spiresight.llm.errors import (
     AuthError, MissingAPIKey, MissingCapabilityError, NetworkError, RateLimitError,
 )
 from spiresight.prompts.loader import PromptLoader
+from spiresight.core.inspect_session import InspectSession
 from spiresight.ui.state.run_state_store import RunStateStore
 from spiresight.ui.theme import icon_path
 from spiresight.ui.widgets.mini_bar import MiniBar
@@ -56,6 +57,7 @@ class MainWindow(QMainWindow):
         self._worker: InferenceWorker | None = None
         self._mini_bar: MiniBar | None = None
         self._run_state_store = RunStateStore(self)
+        self._inspect_session = InspectSession(self)
         self._inspect_worker: InspectWorker | None = None
 
         self.fire_action_signal.connect(self.fire_last_action)
@@ -78,9 +80,12 @@ class MainWindow(QMainWindow):
         sb_layout.addSpacing(12)
         sb_layout.addWidget(self._prompt_panel)
         sb_layout.addSpacing(12)
-        self._run_state_panel = RunStatePanel(self._run_state_store, parent=self)
-        self._run_state_panel.inspect_requested.connect(self._on_inspect_requested)
-        self._run_state_panel.clear_requested.connect(self._run_state_store.clear)
+        self._run_state_panel = RunStatePanel(
+            self._run_state_store, self._inspect_session, parent=self
+        )
+        self._run_state_panel.capture_requested.connect(self._on_capture_requested)
+        self._run_state_panel.done_requested.connect(self._on_done_requested)
+        self._run_state_panel.clear_requested.connect(self._on_clear_requested)
         sb_layout.addWidget(self._run_state_panel, stretch=1)
         sidebar.setFixedWidth(280)
 
@@ -306,8 +311,26 @@ class MainWindow(QMainWindow):
 
     # ─── inspect flow ────────────────────────────────────────────
 
-    def _on_inspect_requested(self) -> None:
+    def _on_capture_requested(self) -> None:
+        try:
+            png = self._capture.grab_primary()
+        except Exception as exc:  # noqa: BLE001
+            self.statusBar().showMessage(f"Capture failed: {exc}", 5000)
+            return
+        try:
+            self._inspect_session.add_frame(png)
+        except RuntimeError as exc:
+            self.statusBar().showMessage(str(exc), 5000)
+            return
+        self.statusBar().showMessage(
+            f"Captured frame {self._inspect_session.count}.", 2000
+        )
+
+    def _on_done_requested(self) -> None:
         if self._inspect_worker is not None and self._inspect_worker.isRunning():
+            return
+        frames = self._inspect_session.frames
+        if not frames:
             return
         runner = InferenceRunner(
             config=self._config,
@@ -316,28 +339,39 @@ class MainWindow(QMainWindow):
             screen_capture=self._capture,
             run_state_store=self._run_state_store,
         )
-        self._run_state_panel.set_inspect_enabled(False, "Inspecting…")
-        self.statusBar().showMessage("Inspecting run state…")
+        self._run_state_panel.set_busy(True)
+        self.statusBar().showMessage(
+            f"Inspecting {len(frames)} frame(s)…"
+        )
 
-        self._inspect_worker = InspectWorker(runner, self)
+        self._inspect_worker = InspectWorker(runner, frames, self)
         self._inspect_worker.ready.connect(self._on_inspect_ready)
         self._inspect_worker.failed.connect(self._on_inspect_failed)
         self._inspect_worker.start()
 
+    def _on_clear_requested(self) -> None:
+        self._inspect_session.clear()
+        self._run_state_store.clear()
+        self.statusBar().showMessage("Run state cleared.", 2000)
+
     def _on_inspect_ready(self, state: RunState) -> None:
         self._run_state_store.set(state)
-        self._run_state_panel.set_inspect_enabled(True)
+        self._inspect_session.clear()
+        self._run_state_panel.set_busy(False)
         self.statusBar().showMessage("Run state captured.", 3000)
 
     def _on_inspect_failed(self, exc: Exception) -> None:
-        self._run_state_panel.set_inspect_enabled(True)
+        self._run_state_panel.set_busy(False)
+        # session frames are preserved so the user can retry
         if isinstance(exc, MissingCapabilityError):
             missing = ", ".join(sorted(c.value for c in exc.missing))
             self.statusBar().showMessage(
-                f"Inspect needs {missing} — switch model.", 8000)
+                f"Inspect needs {missing} — switch model.", 8000
+            )
         elif isinstance(exc, ValueError):
             self.statusBar().showMessage(
-                "Inspect failed: malformed response, try again.", 8000)
+                "Inspect failed: malformed response, try again.", 8000
+            )
         else:
             self.statusBar().showMessage(f"Inspect failed: {exc}", 8000)
 
@@ -345,7 +379,7 @@ class MainWindow(QMainWindow):
         try:
             provider_cfg = self._config.providers.get(self._config.active_provider)
             if provider_cfg is None:
-                self._run_state_panel.set_inspect_enabled(
+                self._run_state_panel.set_capture_enabled(
                     False, "Configure a provider first."
                 )
                 return
@@ -355,16 +389,16 @@ class MainWindow(QMainWindow):
                  if m.id == self._config.active_model), None
             )
             if model is None:
-                self._run_state_panel.set_inspect_enabled(False, "Select a model.")
+                self._run_state_panel.set_capture_enabled(False, "Select a model.")
                 return
             needed = {Capability.VISION, Capability.JSON_MODE}
             missing = needed - set(model.capabilities)
             if missing:
                 names = ", ".join(sorted(c.value for c in missing))
-                self._run_state_panel.set_inspect_enabled(
+                self._run_state_panel.set_capture_enabled(
                     False, f"Active model lacks {names}."
                 )
             else:
-                self._run_state_panel.set_inspect_enabled(True)
+                self._run_state_panel.set_capture_enabled(True)
         except Exception:  # noqa: BLE001
-            self._run_state_panel.set_inspect_enabled(True)
+            self._run_state_panel.set_capture_enabled(True)
