@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QVBoxLayout, QWidget,
 )
 
+from spiresight.core.inspect_session import InspectSession
 from spiresight.core.run_state import RunState
 from spiresight.ui.state.run_state_store import RunStateStore
 
@@ -24,13 +26,59 @@ _RARITY_GLYPHS = {
 }
 
 
-class RunStatePanel(QWidget):
-    inspect_requested = Signal()
-    clear_requested = Signal()
+class _Thumbnail(QFrame):
+    """A small framed thumbnail with an × removal button overlay."""
+    remove_clicked = Signal(int)
 
-    def __init__(self, store: RunStateStore, parent: QWidget | None = None) -> None:
+    def __init__(self, png: bytes, index: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._index = index
+        self.setFixedSize(64, 36)
+        self.setFrameShape(QFrame.Shape.Box)
+        self.setStyleSheet("background-color: #2a2a2a; border: 1px solid #444;")
+
+        pix = QPixmap()
+        pix.loadFromData(png, "PNG")
+        scaled = pix.scaled(
+            QSize(64, 36),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        img_label = QLabel(self)
+        img_label.setPixmap(scaled)
+        img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        img_label.setGeometry(0, 0, 64, 36)
+
+        x_btn = QPushButton("×", self)
+        x_btn.setFixedSize(14, 14)
+        x_btn.setStyleSheet(
+            "QPushButton {background: rgba(0,0,0,0.7); color: white; "
+            "border: none; font-weight: bold; font-size: 10px;} "
+            "QPushButton:hover {background: #c84a4a;}"
+        )
+        x_btn.move(64 - 14, 0)
+        x_btn.clicked.connect(lambda: self.remove_clicked.emit(self._index))
+
+        self.setToolTip(f"Frame {index + 1}")
+
+
+class RunStatePanel(QWidget):
+    capture_requested = Signal()
+    done_requested    = Signal()
+    clear_requested   = Signal()
+
+    def __init__(
+        self,
+        store: RunStateStore,
+        session: InspectSession,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._store = store
+        self._session = session
+        self._capability_ok = True
+        self._capability_tooltip = ""
+        self._busy = False
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -40,16 +88,36 @@ class RunStatePanel(QWidget):
         header.setProperty("role", "section-header")
         outer.addWidget(header)
 
+        # ── thumbnail strip (horizontally scrollable) ────────────
+        self._strip_scroll = QScrollArea()
+        self._strip_scroll.setWidgetResizable(True)
+        self._strip_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._strip_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._strip_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._strip_scroll.setFixedHeight(0)  # hidden when empty
+        self._strip_host = QWidget()
+        self._strip_layout = QHBoxLayout(self._strip_host)
+        self._strip_layout.setContentsMargins(0, 0, 0, 0)
+        self._strip_layout.setSpacing(4)
+        self._strip_layout.addStretch(1)
+        self._strip_scroll.setWidget(self._strip_host)
+        outer.addWidget(self._strip_scroll)
+
+        # ── button row ──────────────────────────────────────────
         button_row = QHBoxLayout()
-        self._inspect_btn = QPushButton("Inspect Now")
-        self._inspect_btn.setObjectName("primary")
-        self._inspect_btn.clicked.connect(self.inspect_requested.emit)
+        self._capture_btn = QPushButton("Capture")
+        self._capture_btn.setObjectName("primary")
+        self._capture_btn.clicked.connect(self.capture_requested.emit)
+        self._done_btn = QPushButton("Done")
+        self._done_btn.clicked.connect(self.done_requested.emit)
         self._clear_btn = QPushButton("Clear")
         self._clear_btn.clicked.connect(self.clear_requested.emit)
-        button_row.addWidget(self._inspect_btn)
+        button_row.addWidget(self._capture_btn)
+        button_row.addWidget(self._done_btn)
         button_row.addWidget(self._clear_btn)
         outer.addLayout(button_row)
 
+        # ── state content (existing rendering, scrollable) ──────
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -61,11 +129,87 @@ class RunStatePanel(QWidget):
         outer.addWidget(self._scroll, stretch=1)
 
         store.changed.connect(self._render)
+        session.changed.connect(self._refresh_thumbnails)
         self._render(store.get())
+        self._refresh_thumbnails()
+        self._update_button_states()
 
-    def set_inspect_enabled(self, enabled: bool, tooltip: str = "") -> None:
-        self._inspect_btn.setEnabled(enabled)
-        self._inspect_btn.setToolTip(tooltip)
+    # ── public control API ──────────────────────────────────────
+
+    def set_capture_enabled(self, enabled: bool, tooltip: str = "") -> None:
+        self._capability_ok = enabled
+        self._capability_tooltip = tooltip
+        self._update_button_states()
+
+    def set_busy(self, busy: bool) -> None:
+        self._busy = busy
+        self._update_button_states()
+
+    # ── thumbnail strip ─────────────────────────────────────────
+
+    def _refresh_thumbnails(self) -> None:
+        # clear existing
+        while self._strip_layout.count():
+            item = self._strip_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+
+        frames = self._session.frames
+        if not frames:
+            self._strip_scroll.setFixedHeight(0)
+            self._strip_layout.addStretch(1)
+            self._update_button_states()
+            return
+
+        self._strip_scroll.setFixedHeight(44)
+        for i, png in enumerate(frames):
+            thumb = _Thumbnail(png, i, parent=self._strip_host)
+            thumb.remove_clicked.connect(self._session.remove_frame)
+            self._strip_layout.addWidget(thumb)
+        self._strip_layout.addStretch(1)
+        self._update_button_states()
+
+    # ── button state machine ────────────────────────────────────
+
+    def _update_button_states(self) -> None:
+        count = self._session.count
+        at_cap = count >= InspectSession.MAX_FRAMES
+
+        if self._busy:
+            self._capture_btn.setEnabled(False)
+            self._capture_btn.setToolTip("")
+            self._done_btn.setEnabled(False)
+            self._done_btn.setText("Analyzing…")
+            self._done_btn.setToolTip("")
+            return
+
+        self._done_btn.setText("Done")
+
+        if not self._capability_ok:
+            self._capture_btn.setEnabled(False)
+            self._capture_btn.setToolTip(self._capability_tooltip)
+            self._done_btn.setEnabled(False)
+            self._done_btn.setToolTip(self._capability_tooltip)
+            return
+
+        if at_cap:
+            self._capture_btn.setEnabled(False)
+            self._capture_btn.setToolTip(
+                f"Maximum {InspectSession.MAX_FRAMES} frames per session."
+            )
+        else:
+            self._capture_btn.setEnabled(True)
+            self._capture_btn.setToolTip("")
+
+        if count == 0:
+            self._done_btn.setEnabled(False)
+            self._done_btn.setToolTip("Capture at least one frame first.")
+        else:
+            self._done_btn.setEnabled(True)
+            self._done_btn.setToolTip("")
+
+    # ── state rendering (unchanged behavior) ────────────────────
 
     def _clear_content(self) -> None:
         while self._content_layout.count():
@@ -77,7 +221,9 @@ class RunStatePanel(QWidget):
     def _render(self, state: RunState | None) -> None:
         self._clear_content()
         if state is None:
-            empty = QLabel("Click Inspect Now to capture your current run.")
+            empty = QLabel(
+                "Press Capture to grab one or more deck-view frames, then Done."
+            )
             empty.setWordWrap(True)
             empty.setStyleSheet("color: #6e7a89;")
             self._content_layout.addWidget(empty)
