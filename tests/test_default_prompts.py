@@ -21,3 +21,19 @@ def test_default_prompts_load_zh():
     assert {qa.id for qa in loader.quick_actions()} >= {
         "card_selection", "combat_strategy", "pathfinding", "relic_analysis",
     }
+
+
+def test_sts_inspector_prompt_present_and_demands_json():
+    loader = PromptLoader(PROMPTS)
+    loader.reload(language="en")
+    sp = loader.get_system_prompt("sts_inspector")
+    assert "JSON" in sp.content
+    assert "cards" in sp.content
+    assert "archetype_candidates" in sp.content
+
+
+def test_sts_expert_mentions_run_context():
+    loader = PromptLoader(PROMPTS)
+    loader.reload(language="en")
+    sp = loader.get_system_prompt("sts_expert")
+    assert "Current Run Context" in sp.content
