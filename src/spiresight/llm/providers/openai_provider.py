@@ -83,6 +83,7 @@ class OpenAIProvider:
         user_text: str,
         image_png: bytes | None,
         cancel_event: threading.Event,
+        json_mode: bool = False,
     ) -> Iterator[StreamChunk]:
         if not self._config.api_key:
             raise MissingAPIKey(self.name)
@@ -97,6 +98,8 @@ class OpenAIProvider:
                 {"role": "user", "content": self._build_user_content(user_text, image_png)},
             ],
         }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
         headers = {
             "Authorization": f"Bearer {self._config.api_key}",
             "Content-Type": "application/json",

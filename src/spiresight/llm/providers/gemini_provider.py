@@ -25,5 +25,6 @@ class GeminiProvider:
         user_text: str,
         image_png: bytes | None,
         cancel_event: threading.Event,
+        json_mode: bool = False,
     ) -> Iterator[StreamChunk]:
         raise NotImplementedError("Gemini provider is not implemented in MVP")

@@ -26,9 +26,9 @@ class _FakeProvider:
         self._chunks = chunks
         self.last_call: dict | None = None
     def list_models(self): return self._models
-    def stream(self, *, model, system, user_text, image_png, cancel_event):
+    def stream(self, *, model, system, user_text, image_png, cancel_event, json_mode=False):
         self.last_call = dict(model=model, system=system, user_text=user_text,
-                              image_png=image_png)
+                              image_png=image_png, json_mode=json_mode)
         yield from self._chunks
 
 

@@ -146,3 +146,41 @@ def test_cancel_event_aborts_stream_mid_flight():
         if "part1" in out:
             evt.set()
     assert out == ["part1"]
+
+
+@respx.mock
+def test_stream_with_json_mode_sets_response_format():
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=_sse('{"choices":[{"delta":{"content":"{}"},"finish_reason":"stop"}]}'),
+        )
+    )
+    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
+    list(p.stream(
+        model="gpt-4o", system="sys", user_text="hi",
+        image_png=None, cancel_event=threading.Event(),
+        json_mode=True,
+    ))
+    body = route.calls.last.request.content.decode()
+    assert '"response_format"' in body
+    assert '"json_object"' in body
+
+
+@respx.mock
+def test_stream_without_json_mode_omits_response_format():
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=_sse('{"choices":[{"delta":{"content":"hi"},"finish_reason":"stop"}]}'),
+        )
+    )
+    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
+    list(p.stream(
+        model="gpt-4o", system="sys", user_text="hi",
+        image_png=None, cancel_event=threading.Event(),
+    ))
+    body = route.calls.last.request.content.decode()
+    assert "response_format" not in body
