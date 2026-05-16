@@ -359,6 +359,7 @@ class MainWindow(QMainWindow):
         self._inspect_session.clear()
         self._run_state_panel.set_busy(False)
         self.statusBar().showMessage("Run state captured.", 3000)
+        self._inspect_worker = None
 
     def _on_inspect_failed(self, exc: Exception) -> None:
         self._run_state_panel.set_busy(False)
@@ -374,6 +375,7 @@ class MainWindow(QMainWindow):
             )
         else:
             self.statusBar().showMessage(f"Inspect failed: {exc}", 8000)
+        self._inspect_worker = None
 
     def _refresh_inspect_availability(self) -> None:
         try:
