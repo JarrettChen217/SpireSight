@@ -14,10 +14,18 @@ from spiresight.capture.screen import ScreenCapture
 from spiresight.config.schema import AppConfig, ProviderConfig
 from spiresight.core.request import InferenceRequest
 from spiresight.core.run_state import RunState
+from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import MissingAPIKey, MissingCapabilityError
 from spiresight.llm.models import ModelInfo
 from spiresight.llm.provider import LLMProvider, StreamChunk
 from spiresight.prompts.loader import PromptLoader
+
+INSPECTOR_PROMPT_ID = "sts_inspector"
+INSPECTOR_USER_TEXT = (
+    "Extract the current run state from this screenshot. "
+    "Output JSON only, matching the schema specified in the system prompt."
+)
+_INSPECT_CAPS = frozenset({Capability.VISION, Capability.JSON_MODE})
 
 ProviderFactory = Callable[[str, ProviderConfig], LLMProvider]
 
@@ -49,6 +57,46 @@ class InferenceRunner:
         if state is None:
             return base
         return f"{base}\n\n{state.to_prompt_block()}"
+
+    def inspect(self, *, cancel_event: threading.Event) -> RunState:
+        """Capture screenshot, call inspector prompt with json_mode, parse RunState."""
+        sp = self._loader.get_system_prompt(INSPECTOR_PROMPT_ID)
+
+        provider_cfg = self._config.providers.get(
+            self._config.active_provider, ProviderConfig()
+        )
+        if not provider_cfg.api_key:
+            raise MissingAPIKey(self._config.active_provider)
+        provider = self._factory(self._config.active_provider, provider_cfg)
+
+        model = self._resolve_model(provider, self._config.active_model)
+        missing = _INSPECT_CAPS - set(model.capabilities)
+        if missing:
+            raise MissingCapabilityError(model=model.id, missing=missing)
+
+        image_png = self._capture.grab_primary()
+
+        buffer: list[str] = []
+        for chunk in provider.stream(
+            model=model.id,
+            system=sp.content,
+            user_text=INSPECTOR_USER_TEXT,
+            image_png=image_png,
+            cancel_event=cancel_event,
+            json_mode=True,
+        ):
+            if chunk.text_delta:
+                buffer.append(chunk.text_delta)
+            if chunk.finish_reason is not None:
+                break
+
+        raw = "".join(buffer).strip()
+        try:
+            return RunState.model_validate_json(raw)
+        except Exception as exc:
+            raise ValueError(
+                f"Inspector returned unparseable JSON: {raw[:200]}"
+            ) from exc
 
     def run(
         self,

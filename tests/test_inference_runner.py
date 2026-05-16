@@ -9,6 +9,7 @@ from spiresight.core.request import InferenceRequest
 from spiresight.core.runner import InferenceRunner
 from spiresight.core.run_state import Card, RunState
 from spiresight.llm.capabilities import Capability
+from spiresight.llm.capabilities import Capability as Cap
 from spiresight.llm.errors import MissingAPIKey, MissingCapabilityError
 from spiresight.llm.models import ModelInfo
 from spiresight.llm.provider import StreamChunk
@@ -203,3 +204,84 @@ def test_run_without_store_works_unchanged():
     runner = _runner(provider=provider, loader=_FakeLoader(qa, sp))  # no store
     list(runner.run(InferenceRequest("x", "", False), cancel_event=threading.Event()))
     assert provider.last_call["system"] == "base prompt"
+
+
+def _inspect_provider(*, models, chunks):
+    return _FakeProvider(models=models, chunks=chunks)
+
+
+def test_inspect_buffers_chunks_parses_json_returns_run_state():
+    sp = SystemPrompt(id="inspector", description="", content="emit JSON only")
+    provider = _inspect_provider(
+        models=[ModelInfo("gpt-4o", "gpt-4o",
+                          frozenset({Cap.VISION, Cap.JSON_MODE}), 128_000)],
+        chunks=[
+            StreamChunk('{"cards":[{"name":"Strike","count":4,"rarity":"starter",'),
+            StreamChunk('"usefulness":"skip","note":""}],"relics":[],"potions":[],'),
+            StreamChunk('"archetype_candidates":[],"overall_eval":"",'),
+            StreamChunk('"inspected_at":"2026-05-16T00:00:00+00:00"}', "stop"),
+        ],
+    )
+
+    class _StaticLoader:
+        def get_system_prompt(self, _): return sp
+
+    cfg = AppConfig(active_provider="openai", active_model="gpt-4o")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    runner = InferenceRunner(
+        config=cfg, prompt_loader=_StaticLoader(),
+        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+    )
+
+    state = runner.inspect(cancel_event=threading.Event())
+    assert state.cards[0].name == "Strike"
+    assert state.cards[0].count == 4
+    assert provider.last_call["json_mode"] is True
+    assert provider.last_call["image_png"] == b"PNG_BYTES"
+    assert provider.last_call["system"] == "emit JSON only"
+
+
+def test_inspect_raises_value_error_on_malformed_json():
+    sp = SystemPrompt(id="inspector", description="", content="json please")
+    provider = _inspect_provider(
+        models=[ModelInfo("gpt-4o", "gpt-4o",
+                          frozenset({Cap.VISION, Cap.JSON_MODE}), 128_000)],
+        chunks=[StreamChunk("not json at all", "stop")],
+    )
+
+    class _StaticLoader:
+        def get_system_prompt(self, _): return sp
+
+    cfg = AppConfig(active_provider="openai", active_model="gpt-4o")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    runner = InferenceRunner(
+        config=cfg, prompt_loader=_StaticLoader(),
+        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+    )
+
+    with pytest.raises(ValueError):
+        runner.inspect(cancel_event=threading.Event())
+
+
+def test_inspect_raises_missing_capability_when_model_lacks_json_mode():
+    sp = SystemPrompt(id="inspector", description="", content="json")
+    provider = _inspect_provider(
+        models=[ModelInfo("o3", "o3",
+                          frozenset({Cap.VISION}), 200_000)],  # no JSON_MODE
+        chunks=[],
+    )
+
+    class _StaticLoader:
+        def get_system_prompt(self, _): return sp
+
+    cfg = AppConfig(active_provider="openai", active_model="o3")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    runner = InferenceRunner(
+        config=cfg, prompt_loader=_StaticLoader(),
+        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+    )
+
+    with pytest.raises(MissingCapabilityError) as exc:
+        runner.inspect(cancel_event=threading.Event())
+    assert Cap.JSON_MODE in exc.value.missing
+    assert Cap.VISION not in exc.value.missing  # model has VISION
