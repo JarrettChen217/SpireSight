@@ -233,7 +233,7 @@ def test_inspect_buffers_chunks_parses_json_returns_run_state():
         provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
     )
 
-    state = runner.inspect(cancel_event=threading.Event())
+    state = runner.inspect(images=[b"PNG_BYTES"], cancel_event=threading.Event())
     assert state.cards[0].name == "Strike"
     assert state.cards[0].count == 4
     assert provider.last_call["json_mode"] is True
@@ -260,7 +260,7 @@ def test_inspect_raises_value_error_on_malformed_json():
     )
 
     with pytest.raises(ValueError):
-        runner.inspect(cancel_event=threading.Event())
+        runner.inspect(images=[b"PNG_BYTES"], cancel_event=threading.Event())
 
 
 def test_inspect_raises_missing_capability_when_model_lacks_json_mode():
@@ -282,6 +282,59 @@ def test_inspect_raises_missing_capability_when_model_lacks_json_mode():
     )
 
     with pytest.raises(MissingCapabilityError) as exc:
-        runner.inspect(cancel_event=threading.Event())
+        runner.inspect(images=[b"PNG_BYTES"], cancel_event=threading.Event())
     assert Cap.JSON_MODE in exc.value.missing
     assert Cap.VISION not in exc.value.missing  # model has VISION
+
+
+def test_inspect_with_multiple_frames_passes_all_to_provider():
+    sp = SystemPrompt(id="inspector", description="", content="emit JSON only")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o",
+                          frozenset({Cap.VISION, Cap.JSON_MODE}), 128_000)],
+        chunks=[
+            StreamChunk('{"cards":[],"relics":[],"potions":[],'),
+            StreamChunk('"archetype_candidates":[],"overall_eval":"",'),
+            StreamChunk('"inspected_at":"2026-05-16T00:00:00+00:00"}', "stop"),
+        ],
+    )
+
+    class _StaticLoader:
+        def get_system_prompt(self, _): return sp
+
+    cfg = AppConfig(active_provider="openai", active_model="gpt-4o")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    runner = InferenceRunner(
+        config=cfg, prompt_loader=_StaticLoader(),
+        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+    )
+
+    state = runner.inspect(
+        images=[b"PNG_A", b"PNG_B", b"PNG_C"],
+        cancel_event=threading.Event(),
+    )
+    assert state.cards == []
+    assert provider.last_call["images"] == [b"PNG_A", b"PNG_B", b"PNG_C"]
+
+
+def test_inspect_with_no_frames_raises_value_error():
+    sp = SystemPrompt(id="inspector", description="", content="json")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o",
+                          frozenset({Cap.VISION, Cap.JSON_MODE}), 128_000)],
+        chunks=[],
+    )
+
+    class _StaticLoader:
+        def get_system_prompt(self, _): return sp
+
+    cfg = AppConfig(active_provider="openai", active_model="gpt-4o")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    runner = InferenceRunner(
+        config=cfg, prompt_loader=_StaticLoader(),
+        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+    )
+
+    with pytest.raises(ValueError, match="at least one frame"):
+        runner.inspect(images=[], cancel_event=threading.Event())
+    assert provider.last_call is None  # provider was never called

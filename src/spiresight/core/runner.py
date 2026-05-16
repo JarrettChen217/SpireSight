@@ -58,8 +58,11 @@ class InferenceRunner:
             return base
         return f"{base}\n\n{state.to_prompt_block()}"
 
-    def inspect(self, *, cancel_event: threading.Event) -> RunState:
-        """Capture screenshot, call inspector prompt with json_mode, parse RunState."""
+    def inspect(self, *, images: list[bytes], cancel_event: threading.Event) -> RunState:
+        """Send N pre-captured PNG frames to the inspector prompt, parse RunState."""
+        if not images:
+            raise ValueError("inspect requires at least one frame")
+
         sp = self._loader.get_system_prompt(INSPECTOR_PROMPT_ID)
 
         provider_cfg = self._config.providers.get(
@@ -74,14 +77,12 @@ class InferenceRunner:
         if missing:
             raise MissingCapabilityError(model=model.id, missing=missing)
 
-        image_png = self._capture.grab_primary()
-
         buffer: list[str] = []
         for chunk in provider.stream(
             model=model.id,
             system=sp.content,
             user_text=INSPECTOR_USER_TEXT,
-            images=[image_png],
+            images=images,
             cancel_event=cancel_event,
             json_mode=True,
         ):
