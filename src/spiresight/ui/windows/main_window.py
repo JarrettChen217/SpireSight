@@ -145,7 +145,6 @@ class MainWindow(QMainWindow):
         self._store.save(self._config)
         self._apply_always_on_top()
         self._update_pin_icon()
-        self.show()
 
     def _update_pin_icon(self) -> None:
         icon_name = "pin_filled" if self._config.always_on_top else "pin_outline"
@@ -154,9 +153,14 @@ class MainWindow(QMainWindow):
     def _apply_always_on_top(self) -> None:
         flags = self.windowFlags()
         if self._config.always_on_top:
-            self.setWindowFlags(flags | Qt.WindowType.WindowStaysOnTopHint)
+            flags |= Qt.WindowType.WindowStaysOnTopHint
         else:
-            self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
+            flags &= ~Qt.WindowType.WindowStaysOnTopHint
+        handle = self.windowHandle()
+        if handle is not None:
+            handle.setFlags(flags)
+        else:
+            self.setWindowFlags(flags)
 
     def _on_picker_changed(self, provider: str, model_id: str) -> None:
         if provider:

@@ -52,11 +52,15 @@ class MiniBar(QWidget):
     def _toggle_pin(self) -> None:
         flags = self.windowFlags()
         if flags & Qt.WindowType.WindowStaysOnTopHint:
-            self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
+            flags &= ~Qt.WindowType.WindowStaysOnTopHint
         else:
-            self.setWindowFlags(flags | Qt.WindowType.WindowStaysOnTopHint)
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        handle = self.windowHandle()
+        if handle is not None:
+            handle.setFlags(flags)
+        else:
+            self.setWindowFlags(flags)
         self._update_pin_icon()
-        self.show()
 
     def _update_pin_icon(self) -> None:
         on_top = bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
