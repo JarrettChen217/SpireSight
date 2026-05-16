@@ -1,0 +1,71 @@
+/* src/spiresight/resources/qss/dark_fantasy.qss
+   Dark-fantasy palette. Color tokens are inlined; if you change one,
+   update src/spiresight/ui/theme.py::COLORS to match. */
+
+QWidget {
+    background-color: #1a1410;
+    color: #d9b885;
+    font-family: "Inter", "SF Pro Text", "Segoe UI", sans-serif;
+    font-size: 12px;
+}
+
+QMainWindow, QDialog {
+    background-color: #1a1410;
+}
+
+QLineEdit, QPlainTextEdit, QTextEdit, QTextBrowser {
+    background-color: #15100c;
+    border: 1px solid #4a3422;
+    border-radius: 4px;
+    padding: 6px;
+    selection-background-color: #7a5728;
+}
+
+QComboBox {
+    background-color: #1f160f;
+    border: 1px solid #4a3422;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #15100c;
+    selection-background-color: #7a5728;
+    border: 1px solid #4a3422;
+}
+
+QPushButton {
+    background-color: #1f160f;
+    border: 1px solid #4a3422;
+    border-radius: 4px;
+    padding: 6px 12px;
+    color: #d9b885;
+}
+
+QPushButton:hover { background-color: #2a1d14; }
+QPushButton:pressed { background-color: #15100c; }
+
+QPushButton#primary {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #a87838, stop:1 #7a5728);
+    border: 1px solid #c8a878;
+    color: #1a1410;
+    font-weight: 600;
+}
+
+QCheckBox::indicator {
+    width: 14px; height: 14px;
+    border: 1px solid #4a3422;
+    background: #15100c;
+}
+QCheckBox::indicator:checked { background: #c8a878; }
+
+QLabel[role="badge-vision"] {
+    color: #b9d9b9;
+    background: #3d5a3d;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+}
+
+QStatusBar { background-color: #0a0705; color: #88715a; }
