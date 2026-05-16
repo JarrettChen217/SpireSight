@@ -1,0 +1,32 @@
+# prompts/locales/zh/quick_actions.yaml
+- id: card_selection
+  label: "选牌建议"
+  icon: icons/card.svg
+  system_prompt_id: sts_expert
+  user_template: "请帮我选择卡牌。{custom_text}"
+  requires_screenshot: true
+  required_capabilities: [VISION]
+
+- id: combat_strategy
+  label: "战斗策略"
+  icon: icons/sword.svg
+  system_prompt_id: sts_expert
+  user_template: "本回合最佳出牌是什么?{custom_text}"
+  requires_screenshot: true
+  required_capabilities: [VISION]
+
+- id: pathfinding
+  label: "地图选路"
+  icon: icons/path.svg
+  system_prompt_id: sts_expert
+  user_template: "应该选哪条路线?为什么?{custom_text}"
+  requires_screenshot: true
+  required_capabilities: [VISION]
+
+- id: relic_analysis
+  label: "遗物评估"
+  icon: icons/relic.svg
+  system_prompt_id: sts_expert
+  user_template: "评估这个遗物。{custom_text}"
+  requires_screenshot: true
+  required_capabilities: [VISION]

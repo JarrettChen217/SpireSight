@@ -1,0 +1,32 @@
+# prompts/locales/en/quick_actions.yaml
+- id: card_selection
+  label: "Card Selection Guide"
+  icon: icons/card.svg
+  system_prompt_id: sts_expert
+  user_template: "Help me choose between the offered cards. {custom_text}"
+  requires_screenshot: true
+  required_capabilities: [VISION]
+
+- id: combat_strategy
+  label: "Combat Strategy"
+  icon: icons/sword.svg
+  system_prompt_id: sts_expert
+  user_template: "What's the best play this turn? {custom_text}"
+  requires_screenshot: true
+  required_capabilities: [VISION]
+
+- id: pathfinding
+  label: "Pathfinding"
+  icon: icons/path.svg
+  system_prompt_id: sts_expert
+  user_template: "Which path should I take and why? {custom_text}"
+  requires_screenshot: true
+  required_capabilities: [VISION]
+
+- id: relic_analysis
+  label: "Relic Analysis"
+  icon: icons/relic.svg
+  system_prompt_id: sts_expert
+  user_template: "Evaluate this relic offering. {custom_text}"
+  requires_screenshot: true
+  required_capabilities: [VISION]
