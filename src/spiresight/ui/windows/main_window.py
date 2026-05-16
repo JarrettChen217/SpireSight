@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QPlainTextEdit, QPushButton, QStatusBar, QVBoxLayout, QWidget,
@@ -35,6 +35,9 @@ from spiresight.ui.workers.inference_worker import InferenceWorker
 
 
 class MainWindow(QMainWindow):
+
+    fire_action_signal = Signal()
+
     def __init__(self, config: AppConfig, store: ConfigStore, loader: PromptLoader) -> None:
         super().__init__()
         self.setWindowTitle("SpireSight")
@@ -45,6 +48,8 @@ class MainWindow(QMainWindow):
         self._capture = ScreenCapture()
         self._worker: InferenceWorker | None = None
         self._mini_bar: MiniBar | None = None
+
+        self.fire_action_signal.connect(self.fire_last_action)
 
         self._apply_always_on_top()
 

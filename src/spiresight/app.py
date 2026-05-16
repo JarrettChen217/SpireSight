@@ -48,7 +48,7 @@ def run() -> int:
 
     hotkey_mgr: HotkeyManager | None = None
     try:
-        hotkey_mgr = HotkeyManager(config.hotkey, on_press=window.fire_last_action)
+        hotkey_mgr = HotkeyManager(config.hotkey, on_press=window.fire_action_signal.emit)
         hotkey_mgr.start()
     except HotkeyRegistrationFailed as exc:
         log.warning("Hotkey registration failed: %s", exc)
