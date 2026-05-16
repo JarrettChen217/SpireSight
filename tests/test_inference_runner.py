@@ -1,15 +1,19 @@
 # tests/test_inference_runner.py
 import threading
+from datetime import datetime, timezone
 import pytest
+from PySide6.QtCore import QCoreApplication
 
 from spiresight.config.schema import AppConfig, ProviderConfig
 from spiresight.core.request import InferenceRequest
 from spiresight.core.runner import InferenceRunner
+from spiresight.core.run_state import Card, RunState
 from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import MissingAPIKey, MissingCapabilityError
 from spiresight.llm.models import ModelInfo
 from spiresight.llm.provider import StreamChunk
 from spiresight.prompts.schema import QuickAction, SystemPrompt
+from spiresight.ui.state.run_state_store import RunStateStore
 
 
 class _FakeLoader:
@@ -128,3 +132,74 @@ def test_missing_api_key_raises():
     )
     with pytest.raises(MissingAPIKey):
         list(runner.run(InferenceRequest("x", "", False), cancel_event=threading.Event()))
+
+
+@pytest.fixture(scope="module")
+def qapp():
+    app = QCoreApplication.instance() or QCoreApplication([])
+    yield app
+
+
+def _stateful_runner(provider, loader, capture, store):
+    cfg = AppConfig(active_provider="openai", active_model="gpt-4o")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    return InferenceRunner(
+        config=cfg,
+        prompt_loader=loader,
+        provider_factory=lambda name, pcfg: provider,
+        screen_capture=capture,
+        run_state_store=store,
+    )
+
+
+def test_run_appends_run_state_block_to_system_when_store_has_state(qapp):
+    qa = QuickAction(id="x", label="X", system_prompt_id="s",
+                     user_template="t {custom_text}", requires_screenshot=False,
+                     required_capabilities=[])
+    sp = SystemPrompt(id="s", description="", content="base prompt")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o", frozenset(), 128_000)],
+        chunks=[StreamChunk("ok", "stop")],
+    )
+    store = RunStateStore()
+    store.set(RunState(
+        cards=[Card(name="Heavy Blade+", count=1, rarity="uncommon", usefulness="key")],
+        relics=[], potions=[], archetype_candidates=[],
+        overall_eval="lean strength",
+        inspected_at=datetime(2026, 5, 16, tzinfo=timezone.utc),
+    ))
+    runner = _stateful_runner(provider, _FakeLoader(qa, sp), _FakeCapture(), store)
+    list(runner.run(InferenceRequest("x", "", False), cancel_event=threading.Event()))
+    assert provider.last_call["system"].startswith("base prompt")
+    assert "## Current Run Context" in provider.last_call["system"]
+    assert "Heavy Blade+" in provider.last_call["system"]
+    assert "lean strength" in provider.last_call["system"]
+
+
+def test_run_leaves_system_unchanged_when_store_empty(qapp):
+    qa = QuickAction(id="x", label="X", system_prompt_id="s",
+                     user_template="t", requires_screenshot=False,
+                     required_capabilities=[])
+    sp = SystemPrompt(id="s", description="", content="base prompt")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o", frozenset(), 128_000)],
+        chunks=[StreamChunk("ok", "stop")],
+    )
+    store = RunStateStore()  # empty
+    runner = _stateful_runner(provider, _FakeLoader(qa, sp), _FakeCapture(), store)
+    list(runner.run(InferenceRequest("x", "", False), cancel_event=threading.Event()))
+    assert provider.last_call["system"] == "base prompt"
+
+
+def test_run_without_store_works_unchanged():
+    qa = QuickAction(id="x", label="X", system_prompt_id="s",
+                     user_template="t", requires_screenshot=False,
+                     required_capabilities=[])
+    sp = SystemPrompt(id="s", description="", content="base prompt")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o", frozenset(), 128_000)],
+        chunks=[StreamChunk("ok", "stop")],
+    )
+    runner = _runner(provider=provider, loader=_FakeLoader(qa, sp))  # no store
+    list(runner.run(InferenceRequest("x", "", False), cancel_event=threading.Event()))
+    assert provider.last_call["system"] == "base prompt"

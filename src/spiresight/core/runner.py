@@ -8,16 +8,22 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable, Iterator
+from typing import Protocol
 
 from spiresight.capture.screen import ScreenCapture
 from spiresight.config.schema import AppConfig, ProviderConfig
 from spiresight.core.request import InferenceRequest
+from spiresight.core.run_state import RunState
 from spiresight.llm.errors import MissingAPIKey, MissingCapabilityError
 from spiresight.llm.models import ModelInfo
 from spiresight.llm.provider import LLMProvider, StreamChunk
 from spiresight.prompts.loader import PromptLoader
 
 ProviderFactory = Callable[[str, ProviderConfig], LLMProvider]
+
+
+class RunStateSource(Protocol):
+    def get(self) -> RunState | None: ...
 
 
 class InferenceRunner:
@@ -28,11 +34,21 @@ class InferenceRunner:
         prompt_loader: PromptLoader,
         provider_factory: ProviderFactory,
         screen_capture: ScreenCapture,
+        run_state_store: RunStateSource | None = None,
     ) -> None:
         self._config = config
         self._loader = prompt_loader
         self._factory = provider_factory
         self._capture = screen_capture
+        self._store = run_state_store
+
+    def _compose_system(self, base: str) -> str:
+        if self._store is None:
+            return base
+        state = self._store.get()
+        if state is None:
+            return base
+        return f"{base}\n\n{state.to_prompt_block()}"
 
     def run(
         self,
@@ -62,7 +78,7 @@ class InferenceRunner:
 
         yield from provider.stream(
             model=model.id,
-            system=sp.content,
+            system=self._compose_system(sp.content),
             user_text=user_text,
             image_png=image_png,
             cancel_event=cancel_event,
