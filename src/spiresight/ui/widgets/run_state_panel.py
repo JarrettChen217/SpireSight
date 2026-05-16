@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 
 from spiresight.core.inspect_session import InspectSession
 from spiresight.core.run_state import RunState
+from spiresight.prompts.ui_locale import UILocale
 from spiresight.ui.state.run_state_store import RunStateStore
 
 _USEFULNESS_COLORS = {
@@ -30,7 +31,9 @@ class _Thumbnail(QFrame):
     """A small framed thumbnail with an × removal button overlay."""
     remove_clicked = Signal(int)
 
-    def __init__(self, png: bytes, index: int, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, png: bytes, index: int, tooltip: str, parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._index = index
         self.setFixedSize(64, 36)
@@ -59,7 +62,7 @@ class _Thumbnail(QFrame):
         x_btn.move(64 - 14, 0)
         x_btn.clicked.connect(lambda: self.remove_clicked.emit(self._index))
 
-        self.setToolTip(f"Frame {index + 1}")
+        self.setToolTip(tooltip)
 
 
 class RunStatePanel(QWidget):
@@ -71,11 +74,13 @@ class RunStatePanel(QWidget):
         self,
         store: RunStateStore,
         session: InspectSession,
+        locale: UILocale,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._store = store
         self._session = session
+        self._locale = locale
         self._capability_ok = True
         self._capability_tooltip = ""
         self._busy = False
@@ -84,9 +89,9 @@ class RunStatePanel(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(6)
 
-        header = QLabel("Run State")
-        header.setProperty("role", "section-header")
-        outer.addWidget(header)
+        self._header_label = QLabel(locale.get("panel.header"))
+        self._header_label.setProperty("role", "section-header")
+        outer.addWidget(self._header_label)
 
         # ── thumbnail strip (horizontally scrollable) ────────────
         self._strip_scroll = QScrollArea()
@@ -105,12 +110,12 @@ class RunStatePanel(QWidget):
 
         # ── button row ──────────────────────────────────────────
         button_row = QHBoxLayout()
-        self._capture_btn = QPushButton("Capture")
+        self._capture_btn = QPushButton(locale.get("panel.capture"))
         self._capture_btn.setObjectName("primary")
         self._capture_btn.clicked.connect(self.capture_requested.emit)
-        self._done_btn = QPushButton("Done")
+        self._done_btn = QPushButton(locale.get("panel.done"))
         self._done_btn.clicked.connect(self.done_requested.emit)
-        self._clear_btn = QPushButton("Clear")
+        self._clear_btn = QPushButton(locale.get("panel.clear"))
         self._clear_btn.clicked.connect(self.clear_requested.emit)
         button_row.addWidget(self._capture_btn)
         button_row.addWidget(self._done_btn)
@@ -130,9 +135,9 @@ class RunStatePanel(QWidget):
 
         store.changed.connect(self._render)
         session.changed.connect(self._refresh_thumbnails)
-        self._render(store.get())
+        locale.changed.connect(self._retranslate)
         self._refresh_thumbnails()
-        self._update_button_states()
+        self._retranslate()
 
     # ── public control API ──────────────────────────────────────
 
@@ -164,7 +169,8 @@ class RunStatePanel(QWidget):
 
         self._strip_scroll.setFixedHeight(44)
         for i, png in enumerate(frames):
-            thumb = _Thumbnail(png, i, parent=self._strip_host)
+            tip = self._locale.get("panel.frame_tooltip", n=i + 1)
+            thumb = _Thumbnail(png, i, tip, parent=self._strip_host)
             thumb.remove_clicked.connect(self._session.remove_frame)
             self._strip_layout.addWidget(thumb)
         self._strip_layout.addStretch(1)
@@ -173,6 +179,7 @@ class RunStatePanel(QWidget):
     # ── button state machine ────────────────────────────────────
 
     def _update_button_states(self) -> None:
+        loc = self._locale
         count = self._session.count
         at_cap = count >= InspectSession.MAX_FRAMES
 
@@ -180,11 +187,11 @@ class RunStatePanel(QWidget):
             self._capture_btn.setEnabled(False)
             self._capture_btn.setToolTip("")
             self._done_btn.setEnabled(False)
-            self._done_btn.setText("Analyzing…")
+            self._done_btn.setText(loc.get("panel.done_busy"))
             self._done_btn.setToolTip("")
             return
 
-        self._done_btn.setText("Done")
+        self._done_btn.setText(loc.get("panel.done"))
 
         if not self._capability_ok:
             self._capture_btn.setEnabled(False)
@@ -196,7 +203,7 @@ class RunStatePanel(QWidget):
         if at_cap:
             self._capture_btn.setEnabled(False)
             self._capture_btn.setToolTip(
-                f"Maximum {InspectSession.MAX_FRAMES} frames per session."
+                loc.get("panel.max_frames", max=InspectSession.MAX_FRAMES)
             )
         else:
             self._capture_btn.setEnabled(True)
@@ -204,7 +211,7 @@ class RunStatePanel(QWidget):
 
         if count == 0:
             self._done_btn.setEnabled(False)
-            self._done_btn.setToolTip("Capture at least one frame first.")
+            self._done_btn.setToolTip(loc.get("panel.no_frames"))
         else:
             self._done_btn.setEnabled(True)
             self._done_btn.setToolTip("")
@@ -218,12 +225,26 @@ class RunStatePanel(QWidget):
             if w is not None:
                 w.deleteLater()
 
+    def _retranslate(self) -> None:
+        loc = self._locale
+        self._header_label.setText(loc.get("panel.header"))
+        self._capture_btn.setText(loc.get("panel.capture"))
+        self._done_btn.setText(
+            loc.get("panel.done_busy") if self._busy else loc.get("panel.done")
+        )
+        self._clear_btn.setText(loc.get("panel.clear"))
+        self._re_render()
+        self._refresh_thumbnails()
+        self._update_button_states()
+
+    def _re_render(self) -> None:
+        self._render(self._store.get())
+
     def _render(self, state: RunState | None) -> None:
         self._clear_content()
+        loc = self._locale
         if state is None:
-            empty = QLabel(
-                "Press Capture to grab one or more deck-view frames, then Done."
-            )
+            empty = QLabel(loc.get("panel.empty_hint"))
             empty.setWordWrap(True)
             empty.setStyleSheet("color: #6e7a89;")
             self._content_layout.addWidget(empty)
@@ -231,7 +252,7 @@ class RunStatePanel(QWidget):
             return
 
         if state.archetype_candidates:
-            self._content_layout.addWidget(self._subheader("Archetype"))
+            self._content_layout.addWidget(self._subheader(loc.get("panel.archetype")))
             for a in state.archetype_candidates:
                 self._content_layout.addWidget(
                     self._line(f"● {a.name} ({a.confidence})",
@@ -241,7 +262,9 @@ class RunStatePanel(QWidget):
 
         if state.cards:
             total = sum(c.count for c in state.cards)
-            self._content_layout.addWidget(self._subheader(f"Cards ({total})"))
+            self._content_layout.addWidget(
+                self._subheader(loc.get("panel.cards", total=total))
+            )
             ordered = sorted(
                 state.cards,
                 key=lambda c: ("key", "good", "situational", "skip").index(c.usefulness),
@@ -257,18 +280,18 @@ class RunStatePanel(QWidget):
                 )
 
         if state.relics:
-            self._content_layout.addWidget(self._subheader("Relics"))
+            self._content_layout.addWidget(self._subheader(loc.get("panel.relics")))
             relic_text = " · ".join(r.name for r in state.relics)
             relic_label = QLabel(relic_text)
             relic_label.setWordWrap(True)
             self._content_layout.addWidget(relic_label)
 
         if state.potions:
-            self._content_layout.addWidget(self._subheader("Potions"))
+            self._content_layout.addWidget(self._subheader(loc.get("panel.potions")))
             self._content_layout.addWidget(QLabel(" · ".join(state.potions)))
 
         if state.overall_eval.strip():
-            self._content_layout.addWidget(self._subheader("Eval"))
+            self._content_layout.addWidget(self._subheader(loc.get("panel.eval")))
             eval_label = QLabel(state.overall_eval.strip())
             eval_label.setWordWrap(True)
             eval_label.setStyleSheet("color: #d5cebf;")
