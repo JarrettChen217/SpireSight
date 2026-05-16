@@ -35,6 +35,12 @@
       "inspected_at": "ISO-8601 timestamp"
     }
 
+    You will receive one or more screenshots of the deck view, possibly
+    with overlap from the player scrolling. Treat them as views of the
+    same deck — a card visible in multiple frames is the same card and
+    must be counted exactly once. Aggregate the full deck from all
+    frames before emitting the JSON.
+
     Rules:
     - rarity in {"starter", "common", "uncommon", "rare"}.
     - usefulness in {"skip", "situational", "good", "key"}. Judge each
