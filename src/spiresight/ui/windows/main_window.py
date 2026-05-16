@@ -29,6 +29,7 @@ from spiresight.llm.errors import (
     AuthError, MissingAPIKey, MissingCapabilityError, NetworkError, RateLimitError,
 )
 from spiresight.prompts.loader import PromptLoader
+from spiresight.prompts.ui_locale import UILocale
 from spiresight.core.inspect_session import InspectSession
 from spiresight.ui.state.run_state_store import RunStateStore
 from spiresight.ui.theme import icon_path
@@ -58,6 +59,9 @@ class MainWindow(QMainWindow):
         self._mini_bar: MiniBar | None = None
         self._run_state_store = RunStateStore(self)
         self._inspect_session = InspectSession(self)
+        self._ui_locale = UILocale(
+            self._loader._root / "locales", self._config.language, parent=self
+        )
         self._inspect_worker: InspectWorker | None = None
 
         self.fire_action_signal.connect(self.fire_last_action)
@@ -81,7 +85,7 @@ class MainWindow(QMainWindow):
         sb_layout.addWidget(self._prompt_panel)
         sb_layout.addSpacing(12)
         self._run_state_panel = RunStatePanel(
-            self._run_state_store, self._inspect_session, parent=self
+            self._run_state_store, self._inspect_session, self._ui_locale, parent=self
         )
         self._run_state_panel.capture_requested.connect(self._on_capture_requested)
         self._run_state_panel.done_requested.connect(self._on_done_requested)
@@ -162,6 +166,7 @@ class MainWindow(QMainWindow):
 
         self.setStatusBar(QStatusBar())
         self._refresh_inspect_availability()
+        self._ui_locale.changed.connect(self._retranslate)
 
     # ─── lifecycle helpers ───────────────────────────────────────
 
@@ -201,6 +206,7 @@ class MainWindow(QMainWindow):
         if dlg.exec():
             self._store.save(self._config)
             self._loader.reload(language=self._config.language)
+            self._ui_locale.set_language(self._config.language)
             self._prompt_panel.rebuild()
             self._apply_always_on_top()
             self.show()  # re-apply flags
@@ -309,13 +315,17 @@ class MainWindow(QMainWindow):
         self._send_btn.setEnabled(True)
         self._cancel_btn.setEnabled(False)
 
+    def _retranslate(self) -> None:
+        self._refresh_inspect_availability()
+
     # ─── inspect flow ────────────────────────────────────────────
 
     def _on_capture_requested(self) -> None:
+        loc = self._ui_locale
         try:
             png = self._capture.grab_primary()
         except Exception as exc:  # noqa: BLE001
-            self.statusBar().showMessage(f"Capture failed: {exc}", 5000)
+            self.statusBar().showMessage(loc.get("main.capture_failed", error=str(exc)), 5000)
             return
         try:
             self._inspect_session.add_frame(png)
@@ -323,10 +333,11 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(str(exc), 5000)
             return
         self.statusBar().showMessage(
-            f"Captured frame {self._inspect_session.count}.", 2000
+            loc.get("main.captured_frame", count=self._inspect_session.count), 2000
         )
 
     def _on_done_requested(self) -> None:
+        loc = self._ui_locale
         if self._inspect_worker is not None and self._inspect_worker.isRunning():
             return
         frames = self._inspect_session.frames
@@ -341,7 +352,7 @@ class MainWindow(QMainWindow):
         )
         self._run_state_panel.set_busy(True)
         self.statusBar().showMessage(
-            f"Inspecting {len(frames)} frame(s)…"
+            loc.get("main.inspecting", count=len(frames))
         )
 
         self._inspect_worker = InspectWorker(runner, frames, self)
@@ -352,37 +363,39 @@ class MainWindow(QMainWindow):
     def _on_clear_requested(self) -> None:
         self._inspect_session.clear()
         self._run_state_store.clear()
-        self.statusBar().showMessage("Run state cleared.", 2000)
+        self.statusBar().showMessage(self._ui_locale.get("main.run_state_cleared"), 2000)
 
     def _on_inspect_ready(self, state: RunState) -> None:
         self._run_state_store.set(state)
         self._inspect_session.clear()
         self._run_state_panel.set_busy(False)
-        self.statusBar().showMessage("Run state captured.", 3000)
+        self.statusBar().showMessage(self._ui_locale.get("main.run_state_captured"), 3000)
         self._inspect_worker = None
 
     def _on_inspect_failed(self, exc: Exception) -> None:
+        loc = self._ui_locale
         self._run_state_panel.set_busy(False)
         # session frames are preserved so the user can retry
         if isinstance(exc, MissingCapabilityError):
             missing = ", ".join(sorted(c.value for c in exc.missing))
             self.statusBar().showMessage(
-                f"Inspect needs {missing} — switch model.", 8000
+                loc.get("main.inspect_needs", missing=missing), 8000
             )
         elif isinstance(exc, ValueError):
-            self.statusBar().showMessage(
-                "Inspect failed: malformed response, try again.", 8000
-            )
+            self.statusBar().showMessage(loc.get("main.inspect_malformed"), 8000)
         else:
-            self.statusBar().showMessage(f"Inspect failed: {exc}", 8000)
+            self.statusBar().showMessage(
+                loc.get("main.inspect_failed", error=str(exc)), 8000
+            )
         self._inspect_worker = None
 
     def _refresh_inspect_availability(self) -> None:
+        loc = self._ui_locale
         try:
             provider_cfg = self._config.providers.get(self._config.active_provider)
             if provider_cfg is None:
                 self._run_state_panel.set_capture_enabled(
-                    False, "Configure a provider first."
+                    False, loc.get("main.no_provider")
                 )
                 return
             provider = registry.get(self._config.active_provider, provider_cfg)
@@ -391,14 +404,16 @@ class MainWindow(QMainWindow):
                  if m.id == self._config.active_model), None
             )
             if model is None:
-                self._run_state_panel.set_capture_enabled(False, "Select a model.")
+                self._run_state_panel.set_capture_enabled(
+                    False, loc.get("main.no_model")
+                )
                 return
             needed = {Capability.VISION, Capability.JSON_MODE}
             missing = needed - set(model.capabilities)
             if missing:
                 names = ", ".join(sorted(c.value for c in missing))
                 self._run_state_panel.set_capture_enabled(
-                    False, f"Active model lacks {names}."
+                    False, loc.get("main.lacks_caps", caps=names)
                 )
             else:
                 self._run_state_panel.set_capture_enabled(True)
