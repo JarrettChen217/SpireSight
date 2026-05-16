@@ -81,7 +81,7 @@ class OpenAIProvider:
         model: str,
         system: str,
         user_text: str,
-        image_png: bytes | None,
+        images: list[bytes],
         cancel_event: threading.Event,
         json_mode: bool = False,
     ) -> Iterator[StreamChunk]:
@@ -95,7 +95,7 @@ class OpenAIProvider:
             "stream": True,
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": self._build_user_content(user_text, image_png)},
+                {"role": "user", "content": self._build_user_content(user_text, images)},
             ],
         }
         if json_mode:
@@ -122,15 +122,17 @@ class OpenAIProvider:
             raise NetworkError(str(exc)) from exc
 
     @staticmethod
-    def _build_user_content(text: str, image_png: bytes | None) -> list[dict] | str:
-        if image_png is None:
+    def _build_user_content(text: str, images: list[bytes]) -> list[dict] | str:
+        if not images:
             return text
-        b64 = base64.b64encode(image_png).decode()
-        return [
-            {"type": "text", "text": text},
-            {"type": "image_url",
-             "image_url": {"url": f"data:image/png;base64,{b64}"}},
-        ]
+        parts: list[dict] = [{"type": "text", "text": text}]
+        for png in images:
+            b64 = base64.b64encode(png).decode()
+            parts.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{b64}"},
+            })
+        return parts
 
     @staticmethod
     def _parse_sse(resp: httpx.Response, cancel_event: threading.Event) -> Iterator[StreamChunk]:

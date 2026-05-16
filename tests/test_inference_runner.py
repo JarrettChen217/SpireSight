@@ -31,9 +31,9 @@ class _FakeProvider:
         self._chunks = chunks
         self.last_call: dict | None = None
     def list_models(self): return self._models
-    def stream(self, *, model, system, user_text, image_png, cancel_event, json_mode=False):
+    def stream(self, *, model, system, user_text, images, cancel_event, json_mode=False):
         self.last_call = dict(model=model, system=system, user_text=user_text,
-                              image_png=image_png, json_mode=json_mode)
+                              images=images, json_mode=json_mode)
         yield from self._chunks
 
 
@@ -71,7 +71,7 @@ def test_run_streams_text_with_image_when_required():
     assert provider.last_call["model"] == "gpt-4o"
     assert provider.last_call["system"] == "be helpful"
     assert provider.last_call["user_text"] == "Pick. extra"
-    assert provider.last_call["image_png"] == b"PNG_BYTES"
+    assert provider.last_call["images"] == [b"PNG_BYTES"]
 
 
 def test_run_omits_image_when_screenshot_unchecked():
@@ -87,7 +87,7 @@ def test_run_omits_image_when_screenshot_unchecked():
     runner = _runner(provider=provider, loader=_FakeLoader(qa, sp))
     list(runner.run(InferenceRequest("x", "", include_screenshot=False),
                     cancel_event=threading.Event()))
-    assert provider.last_call["image_png"] is None
+    assert provider.last_call["images"] == []
 
 
 def test_capability_pre_flight_blocks_non_vision_model():
@@ -237,7 +237,7 @@ def test_inspect_buffers_chunks_parses_json_returns_run_state():
     assert state.cards[0].name == "Strike"
     assert state.cards[0].count == 4
     assert provider.last_call["json_mode"] is True
-    assert provider.last_call["image_png"] == b"PNG_BYTES"
+    assert provider.last_call["images"] == [b"PNG_BYTES"]
     assert provider.last_call["system"] == "emit JSON only"
 
 

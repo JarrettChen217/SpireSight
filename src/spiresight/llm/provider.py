@@ -27,7 +27,7 @@ class LLMProvider(Protocol):
         model: str,
         system: str,
         user_text: str,
-        image_png: bytes | None,
+        images: list[bytes],
         cancel_event: threading.Event,
         json_mode: bool = False,
     ) -> Iterator[StreamChunk]: ...

@@ -31,7 +31,7 @@ def test_missing_api_key_raises_on_stream():
     with pytest.raises(MissingAPIKey):
         list(p.stream(
             model="gpt-4o", system="s", user_text="hi",
-            image_png=None, cancel_event=threading.Event(),
+            images=[], cancel_event=threading.Event(),
         ))
 
 
@@ -51,7 +51,7 @@ def test_stream_text_only_request_yields_chunks():
     p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
     chunks = list(p.stream(
         model="gpt-4o", system="sys", user_text="hi",
-        image_png=None, cancel_event=threading.Event(),
+        images=[], cancel_event=threading.Event(),
     ))
     assert route.called
     assert "".join(c.text_delta for c in chunks) == "Hello world"
@@ -74,7 +74,7 @@ def test_stream_with_image_sends_multimodal_payload():
     png = b"\x89PNG\r\n\x1a\nFAKE"
     list(p.stream(
         model="gpt-4o", system="sys", user_text="see this",
-        image_png=png, cancel_event=threading.Event(),
+        images=[png], cancel_event=threading.Event(),
     ))
     body = respx.calls.last.request.content.decode()
     expected_b64 = base64.b64encode(png).decode()
@@ -91,7 +91,7 @@ def test_401_maps_to_auth_error():
     with pytest.raises(AuthError):
         list(p.stream(
             model="gpt-4o", system="s", user_text="u",
-            image_png=None, cancel_event=threading.Event(),
+            images=[], cancel_event=threading.Event(),
         ))
 
 
@@ -104,7 +104,7 @@ def test_429_maps_to_rate_limit():
     with pytest.raises(RateLimitError) as exc:
         list(p.stream(
             model="gpt-4o", system="s", user_text="u",
-            image_png=None, cancel_event=threading.Event(),
+            images=[], cancel_event=threading.Event(),
         ))
     assert exc.value.retry_after == 3.0
 
@@ -118,7 +118,7 @@ def test_network_error_maps():
     with pytest.raises(NetworkError):
         list(p.stream(
             model="gpt-4o", system="s", user_text="u",
-            image_png=None, cancel_event=threading.Event(),
+            images=[], cancel_event=threading.Event(),
         ))
 
 
@@ -140,7 +140,7 @@ def test_cancel_event_aborts_stream_mid_flight():
     out: list[str] = []
     for chunk in p.stream(
         model="gpt-4o", system="s", user_text="u",
-        image_png=None, cancel_event=evt,
+        images=[], cancel_event=evt,
     ):
         out.append(chunk.text_delta)
         if "part1" in out:
@@ -160,7 +160,7 @@ def test_stream_with_json_mode_sets_response_format():
     p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
     list(p.stream(
         model="gpt-4o", system="sys", user_text="hi",
-        image_png=None, cancel_event=threading.Event(),
+        images=[], cancel_event=threading.Event(),
         json_mode=True,
     ))
     body = route.calls.last.request.content.decode()
@@ -180,7 +180,35 @@ def test_stream_without_json_mode_omits_response_format():
     p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
     list(p.stream(
         model="gpt-4o", system="sys", user_text="hi",
-        image_png=None, cancel_event=threading.Event(),
+        images=[], cancel_event=threading.Event(),
     ))
     body = route.calls.last.request.content.decode()
     assert "response_format" not in body
+
+
+def test_build_user_content_no_images_returns_plain_text():
+    from spiresight.llm.providers.openai_provider import OpenAIProvider
+    result = OpenAIProvider._build_user_content("hello", [])
+    assert result == "hello"
+
+
+def test_build_user_content_one_image_returns_parts():
+    from spiresight.llm.providers.openai_provider import OpenAIProvider
+    import base64
+    png = b"\x89PNG"
+    result = OpenAIProvider._build_user_content("hi", [png])
+    assert isinstance(result, list)
+    assert result[0] == {"type": "text", "text": "hi"}
+    assert result[1]["type"] == "image_url"
+    assert result[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert base64.b64decode(result[1]["image_url"]["url"].split(",")[1]) == png
+
+
+def test_build_user_content_three_images_preserves_order():
+    from spiresight.llm.providers.openai_provider import OpenAIProvider
+    pngs = [b"A", b"B", b"C"]
+    result = OpenAIProvider._build_user_content("x", pngs)
+    assert len(result) == 4  # text + 3 images
+    assert result[0]["type"] == "text"
+    for i, (part, expected_png) in enumerate(zip(result[1:], pngs), start=1):
+        assert part["type"] == "image_url"

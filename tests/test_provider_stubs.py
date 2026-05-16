@@ -21,5 +21,5 @@ def test_stub_stream_raises_not_implemented(cls):
     with pytest.raises(NotImplementedError):
         list(p.stream(
             model="x", system="s", user_text="u",
-            image_png=None, cancel_event=threading.Event(),
+            images=[], cancel_event=threading.Event(),
         ))

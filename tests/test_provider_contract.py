@@ -21,7 +21,7 @@ class _Fake:
     def list_models(self) -> list[ModelInfo]:
         return [ModelInfo("fake-1", "Fake 1", frozenset({Capability.VISION}), 8000)]
 
-    def stream(self, *, model, system, user_text, image_png, cancel_event) -> Iterator[StreamChunk]:
+    def stream(self, *, model, system, user_text, images, cancel_event) -> Iterator[StreamChunk]:
         yield StreamChunk(text_delta="hi")
         yield StreamChunk(text_delta="!", finish_reason="stop")
 
@@ -54,7 +54,7 @@ def test_streaming_via_protocol_consumes_chunks():
     fake: LLMProvider = _Fake()
     chunks = list(fake.stream(
         model="fake-1", system="sys", user_text="hi",
-        image_png=None, cancel_event=threading.Event(),
+        images=[], cancel_event=threading.Event(),
     ))
     assert "".join(c.text_delta for c in chunks) == "hi!"
     assert chunks[-1].finish_reason == "stop"

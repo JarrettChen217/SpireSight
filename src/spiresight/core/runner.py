@@ -81,7 +81,7 @@ class InferenceRunner:
             model=model.id,
             system=sp.content,
             user_text=INSPECTOR_USER_TEXT,
-            image_png=image_png,
+            images=[image_png],
             cancel_event=cancel_event,
             json_mode=True,
         ):
@@ -128,7 +128,7 @@ class InferenceRunner:
             model=model.id,
             system=self._compose_system(sp.content),
             user_text=user_text,
-            image_png=image_png,
+            images=[image_png] if image_png is not None else [],
             cancel_event=cancel_event,
         )
 
