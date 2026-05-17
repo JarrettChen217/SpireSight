@@ -49,15 +49,19 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "SPIRESIGHT_VERSION=$VERSION" >> "$GITHUB_ENV"
           PEP440_VERSION="${VERSION//-/.}"
-          sed -i '' "s/^version = .*/version = \"$PEP440_VERSION\"/" pyproject.toml
-          echo "Built version: $VERSION (pyproject: $PEP440_VERSION)"
-          grep '^version' pyproject.toml
+          echo "PEP440_VERSION=$PEP440_VERSION" >> "$GITHUB_ENV"
+          echo "Built version: $VERSION (pyproject will be: $PEP440_VERSION)"
 
       - name: Install create-dmg
         run: brew install create-dmg
 
       - name: Install build dependencies
         run: pip install -e ".[dev]" pyinstaller
+
+      - name: Patch pyproject.toml version
+        run: |
+          sed -i '' "s/^version = .*/version = \"$PEP440_VERSION\"/" pyproject.toml
+          grep '^version' pyproject.toml
 
       - name: PyInstaller build
         run: pyinstaller --noconfirm packaging/spiresight.spec
@@ -96,12 +100,18 @@ jobs:
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
           "SPIRESIGHT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $pep440 = $version -replace '-', '.'
-          (Get-Content pyproject.toml) -replace '^version = .*', "version = ""$pep440""" | Set-Content pyproject.toml
-          Write-Host "Built version: $version (pyproject: $pep440)"
-          Select-String -Path pyproject.toml -Pattern '^version'
+          "PEP440_VERSION=$pep440" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Built version: $version (pyproject will be: $pep440)"
 
       - name: Install build dependencies
         run: pip install -e ".[dev]" pyinstaller
+
+      - name: Patch pyproject.toml version
+        shell: pwsh
+        run: |
+          (Get-Content pyproject.toml) -replace '^version = .*', "version = ""$env:PEP440_VERSION""" | Set-Content pyproject.toml
+          Write-Host "Patched pyproject.toml to: $env:PEP440_VERSION"
+          Select-String -Path pyproject.toml -Pattern '^version'
 
       - name: PyInstaller build
         run: pyinstaller --noconfirm packaging\spiresight.spec
