@@ -41,7 +41,9 @@ def test_frames_returns_defensive_copy():
 
 def test_remove_frame_drops_index_and_emits():
     s = InspectSession()
-    s.add_frame(b"A"); s.add_frame(b"B"); s.add_frame(b"C")
+    s.add_frame(b"A")
+    s.add_frame(b"B")
+    s.add_frame(b"C")
     emitted: list[int] = []
     s.changed.connect(lambda: emitted.append(s.count))
 
@@ -59,7 +61,8 @@ def test_remove_frame_out_of_range_raises():
 
 def test_clear_empties_and_emits():
     s = InspectSession()
-    s.add_frame(b"A"); s.add_frame(b"B")
+    s.add_frame(b"A")
+    s.add_frame(b"B")
     emitted: list[int] = []
     s.changed.connect(lambda: emitted.append(s.count))
 

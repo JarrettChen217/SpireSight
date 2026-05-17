@@ -30,9 +30,10 @@ class PromptPanel(QWidget):
     def rebuild(self) -> None:
         while self._layout.count() > 1:
             item = self._layout.takeAt(1)
-            w = item.widget()
-            if w is not None:
-                w.deleteLater()
+            if item is not None:
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
         for qa in self._loader.quick_actions():
             btn = QPushButton(f"  {qa.label}")
             btn.setProperty("role", "quick-action")

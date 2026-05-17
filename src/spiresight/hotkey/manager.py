@@ -18,7 +18,7 @@ class HotkeyManager:
     def __init__(self, combo: str, *, on_press: Callable[[], None]) -> None:
         self._combo = combo
         self._on_press = on_press
-        self._listener = None
+        self._listener: GlobalHotKeys | None = None
 
     def start(self) -> None:
         try:
