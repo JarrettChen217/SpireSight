@@ -1,7 +1,5 @@
 # tests/test_config_paths.py
 from pathlib import Path
-import sys
-import pytest
 from spiresight.config import paths
 
 

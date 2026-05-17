@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 
 from spiresight.prompts.ui_locale import UILocale
 

@@ -1,6 +1,5 @@
 # tests/test_config_store.py
 import json
-from pathlib import Path
 import pytest
 from spiresight.config.schema import AppConfig, ProviderConfig
 from spiresight.config.store import ConfigStore

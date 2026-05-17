@@ -41,7 +41,7 @@ class _Thumbnail(QFrame):
         self.setStyleSheet("background-color: #2a2a2a; border: 1px solid #444;")
 
         pix = QPixmap()
-        pix.loadFromData(png, "PNG")
+        pix.loadFromData(png, b"PNG")
         scaled = pix.scaled(
             QSize(64, 36),
             Qt.AspectRatioMode.KeepAspectRatio,
@@ -156,9 +156,10 @@ class RunStatePanel(QWidget):
         # clear existing
         while self._strip_layout.count():
             item = self._strip_layout.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.deleteLater()
+            if item is not None:
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
 
         frames = self._session.frames
         if not frames:
@@ -221,9 +222,10 @@ class RunStatePanel(QWidget):
     def _clear_content(self) -> None:
         while self._content_layout.count():
             item = self._content_layout.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.deleteLater()
+            if item is not None:
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
 
     def _retranslate(self) -> None:
         loc = self._locale

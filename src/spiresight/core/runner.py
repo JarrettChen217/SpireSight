@@ -75,7 +75,7 @@ class InferenceRunner:
         model = self._resolve_model(provider, self._config.active_model)
         missing = _INSPECT_CAPS - set(model.capabilities)
         if missing:
-            raise MissingCapabilityError(model=model.id, missing=missing)
+            raise MissingCapabilityError(model=model.id, missing=set(missing))
 
         buffer: list[str] = []
         for chunk in provider.stream(
