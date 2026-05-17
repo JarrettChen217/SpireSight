@@ -40,5 +40,5 @@ class TabWidget(QTabWidget):
             self.setTabText(index, label + (_DOT if dirty else ""))
 
     def _on_current_changed(self, idx: int) -> None:
-        if 0 <= idx < self.count():
+        if 0 <= idx < len(self._base_labels):
             self.setTabText(idx, self._base_labels[idx])

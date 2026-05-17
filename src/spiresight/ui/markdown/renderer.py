@@ -16,6 +16,7 @@ from pygments.lexers import get_lexer_by_name
 from pygments.util import ClassNotFound
 
 _STYLE_PATH = Path(__file__).with_name("style.css")
+_FORMATTER = HtmlFormatter(nowrap=False, noclasses=False, cssclass="highlight")
 
 
 def _highlight_code(code: str, lang: str | None, _attrs: object) -> str:
@@ -27,8 +28,7 @@ def _highlight_code(code: str, lang: str | None, _attrs: object) -> str:
             return ""  # let markdown-it render the default <pre><code> wrapper
     else:
         return ""
-    formatter = HtmlFormatter(nowrap=False, noclasses=False, cssclass="highlight")
-    return highlight(code, lexer, formatter)
+    return highlight(code, lexer, _FORMATTER)
 
 
 @lru_cache(maxsize=1)
