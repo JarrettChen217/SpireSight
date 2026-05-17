@@ -8,7 +8,6 @@ and renders the appropriate modal.
 """
 from __future__ import annotations
 
-
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
