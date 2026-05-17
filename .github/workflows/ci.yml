@@ -30,6 +30,9 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
+      - name: Install Qt system dependencies
+        run: sudo apt-get install -y libegl1 libgles2
+
       - name: Install dev dependencies
         run: pip install -e ".[dev]"
 
@@ -40,4 +43,6 @@ jobs:
         run: mypy src
 
       - name: Pytest
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: pytest -q
