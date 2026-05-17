@@ -34,6 +34,7 @@ jobs:
   build-macos:
     needs: test
     runs-on: macos-14
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -47,18 +48,19 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "SPIRESIGHT_VERSION=$VERSION" >> "$GITHUB_ENV"
-          sed -i '' "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
-          echo "Built version: $VERSION"
+          PEP440_VERSION="${VERSION//-/.}"
+          sed -i '' "s/^version = .*/version = \"$PEP440_VERSION\"/" pyproject.toml
+          echo "Built version: $VERSION (pyproject: $PEP440_VERSION)"
           grep '^version' pyproject.toml
+
+      - name: Install create-dmg
+        run: brew install create-dmg
 
       - name: Install build dependencies
         run: pip install -e ".[dev]" pyinstaller
 
       - name: PyInstaller build
         run: pyinstaller --noconfirm packaging/spiresight.spec
-
-      - name: Install create-dmg
-        run: brew install create-dmg
 
       - name: Create DMG
         run: |
@@ -73,10 +75,12 @@ jobs:
           name: macos-dmg
           path: "*.dmg"
           if-no-files-found: error
+          retention-days: 3
 
   build-windows:
     needs: test
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -91,8 +95,9 @@ jobs:
         run: |
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
           "SPIRESIGHT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          (Get-Content pyproject.toml) -replace '^version = .*', "version = ""$version""" | Set-Content pyproject.toml
-          Write-Host "Built version: $version"
+          $pep440 = $version -replace '-', '.'
+          (Get-Content pyproject.toml) -replace '^version = .*', "version = ""$pep440""" | Set-Content pyproject.toml
+          Write-Host "Built version: $version (pyproject: $pep440)"
           Select-String -Path pyproject.toml -Pattern '^version'
 
       - name: Install build dependencies
@@ -114,6 +119,7 @@ jobs:
           name: windows-zip
           path: "*.zip"
           if-no-files-found: error
+          retention-days: 3
 
   release:
     needs: [build-macos, build-windows]
