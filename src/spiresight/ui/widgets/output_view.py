@@ -1,13 +1,16 @@
-# src/spiresight/ui/widgets/output_view.py
 """Streaming markdown view.
 
-Buffers incoming text deltas and re-renders markdown at most every
-50ms (or every 32 deltas) to keep the UI responsive.
+Buffers incoming text deltas and re-renders at most every 50ms (or
+every 32 deltas) to keep the UI responsive. Each flush runs the buffer
+through spiresight.ui.markdown.renderer.render so we get Pygments-
+highlighted code, real tables, and the shared CSS theme.
 """
 from __future__ import annotations
 
 from PySide6.QtCore import QTimer, Slot
 from PySide6.QtWidgets import QTextBrowser
+
+from spiresight.ui.markdown.renderer import render as render_markdown
 
 _FLUSH_INTERVAL_MS = 50
 _FLUSH_DELTA_COUNT = 32
@@ -26,7 +29,14 @@ class OutputView(QTextBrowser):
     def reset(self) -> None:
         self._buffer.clear()
         self._pending = 0
-        self.setMarkdown("")
+        self.setHtml(render_markdown(""))
+
+    def load_static(self, markdown: str) -> None:
+        """Render a non-streaming markdown blob (used by HistoryTab detail)."""
+        self._flush_timer.stop()
+        self._buffer = [markdown]
+        self._pending = 0
+        self.setHtml(render_markdown(markdown))
 
     @Slot(str)
     def append_delta(self, text: str) -> None:
@@ -42,9 +52,11 @@ class OutputView(QTextBrowser):
         self._flush_timer.stop()
         self._flush()
 
+    def current_markdown(self) -> str:
+        return "".join(self._buffer)
+
     def _flush(self) -> None:
-        self.setMarkdown("".join(self._buffer))
+        self.setHtml(render_markdown("".join(self._buffer)))
         self._pending = 0
-        # keep scroll pinned to bottom while streaming
         sb = self.verticalScrollBar()
         sb.setValue(sb.maximum())

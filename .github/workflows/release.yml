@@ -26,10 +26,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: pyproject.toml
+      - run: sudo apt-get install -y libegl1 libgles2
       - run: pip install -e ".[dev]"
       - run: ruff check src tests
       - run: mypy src
       - run: pytest -q
+        env:
+          QT_QPA_PLATFORM: offscreen
 
   build-macos:
     needs: test

@@ -49,3 +49,9 @@ def test_load_falls_back_when_validation_fails(store, tmp_path):
     # "fr" is not in Literal["en", "zh"]; loader returns defaults.
     cfg = store.load()
     assert cfg.language == "en"
+
+
+def test_include_screenshot_default_defaults_to_true():
+    from spiresight.config.schema import AppConfig
+    cfg = AppConfig()
+    assert cfg.include_screenshot_default is True

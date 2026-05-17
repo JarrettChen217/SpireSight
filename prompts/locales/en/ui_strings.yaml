@@ -13,6 +13,11 @@ panel:
   relics: "Relics"
   potions: "Potions"
   eval: "Eval"
+  cards_group:
+    key: "⭐ Key"
+    good: "Good"
+    situational: "Situational"
+    skip: "Skip"
 
 main:
   capture_failed: "Capture failed: {error}"
@@ -26,3 +31,33 @@ main:
   no_provider: "Configure a provider first."
   no_model: "Select a model."
   lacks_caps: "Active model lacks {caps}."
+
+tab:
+  chat: "Chat"
+  run_state: "Run State"
+  history: "History"
+  screenshot: "Shots"
+  logs: "Logs"
+  help: "Help"
+
+compose:
+  placeholder: "Custom context (optional)…"
+  send: "Send"
+  cancel: "Cancel"
+  include_screenshot: "Include screenshot"
+
+history:
+  empty: "No history yet. Send a request to get started."
+  resend: "Resend"
+  copy_md: "Copy"
+  row_format: "{time} · {label} · {model}"
+
+screenshot:
+  empty: "No screenshot captured yet."
+  save_as: "Save as…"
+  dims_format: "{w}×{h}"
+
+logs:
+  empty: "No events recorded."
+  copy_all: "Copy all"
+  clear: "Clear"

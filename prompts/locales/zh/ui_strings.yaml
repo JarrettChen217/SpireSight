@@ -13,6 +13,11 @@ panel:
   relics: "遗物"
   potions: "药水"
   eval: "评估"
+  cards_group:
+    key: "⭐ 核心"
+    good: "推荐"
+    situational: "可选"
+    skip: "舍弃"
 
 main:
   capture_failed: "捕获失败：{error}"
@@ -26,3 +31,33 @@ main:
   no_provider: "请先配置 Provider。"
   no_model: "请选择模型。"
   lacks_caps: "当前模型缺少 {caps}。"
+
+tab:
+  chat: "Chat"
+  run_state: "Run State"
+  history: "历史"
+  screenshot: "截图"
+  logs: "日志"
+  help: "帮助"
+
+compose:
+  placeholder: "可选自定义上下文…"
+  send: "发送"
+  cancel: "取消"
+  include_screenshot: "附截图"
+
+history:
+  empty: "暂无历史。发送一次请求开始。"
+  resend: "重发"
+  copy_md: "复制"
+  row_format: "{time} · {label} · {model}"
+
+screenshot:
+  empty: "尚未捕获截图。"
+  save_as: "另存为…"
+  dims_format: "{w}×{h}"
+
+logs:
+  empty: "暂无事件。"
+  copy_all: "复制全部"
+  clear: "清空"
