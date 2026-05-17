@@ -10,7 +10,6 @@ import threading
 from collections.abc import Callable, Iterator
 from typing import Protocol
 
-from spiresight.capture.screen import ScreenCapture
 from spiresight.config.schema import AppConfig, ProviderConfig
 from spiresight.core.request import InferenceRequest
 from spiresight.core.run_state import RunState
@@ -30,6 +29,10 @@ _INSPECT_CAPS = frozenset({Capability.VISION, Capability.JSON_MODE})
 ProviderFactory = Callable[[str, ProviderConfig], LLMProvider]
 
 
+class CaptureSource(Protocol):
+    def grab_primary(self) -> bytes: ...
+
+
 class RunStateSource(Protocol):
     def get(self) -> RunState | None: ...
 
@@ -41,7 +44,7 @@ class InferenceRunner:
         config: AppConfig,
         prompt_loader: PromptLoader,
         provider_factory: ProviderFactory,
-        screen_capture: ScreenCapture,
+        screen_capture: CaptureSource,
         run_state_store: RunStateSource | None = None,
     ) -> None:
         self._config = config

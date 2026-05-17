@@ -49,6 +49,13 @@ where = ["src"]
 [tool.setuptools.package-data]
 spiresight = ["resources/qss/*.qss", "resources/icons/*.svg", "resources/backgrounds/*.png"]
 
+[tool.mypy]
+python_version = "3.11"
+
+[[tool.mypy.overrides]]
+module = ["pygments", "pygments.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
