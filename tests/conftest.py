@@ -2,6 +2,9 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+from PySide6.QtWidgets import QApplication
+
 SRC = Path(__file__).resolve().parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
@@ -32,3 +35,12 @@ if "pynput" not in sys.modules:
     _pynput.keyboard = _pynput_kb  # type: ignore[attr-defined]
     sys.modules["pynput"] = _pynput
     sys.modules["pynput.keyboard"] = _pynput_kb
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    """Session-scoped QApplication fixture for tests requiring Qt."""
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    yield app
