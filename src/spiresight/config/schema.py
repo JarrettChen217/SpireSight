@@ -29,3 +29,4 @@ class AppConfig(BaseSettings):
     mini_bar_mode: bool = False
     hotkey: str = "<ctrl>+<shift>+s"
     last_used_prompt_id: str | None = None
+    include_screenshot_default: bool = True
