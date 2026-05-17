@@ -11,14 +11,18 @@ from PyInstaller.utils.hooks import collect_data_files  # noqa: F401  (kept for 
 
 VERSION = os.environ.get("SPIRESIGHT_VERSION", "0.0.0+dev")
 
+# SPECPATH is the directory of this spec file (packaging/).
+# All relative source paths must be anchored to the repo root, one level up.
+ROOT = os.path.join(SPECPATH, "..")
+
 datas = [
-    ("prompts", "prompts"),
-    ("src/spiresight/resources", "spiresight/resources"),
+    (os.path.join(ROOT, "prompts"), "prompts"),
+    (os.path.join(ROOT, "src", "spiresight", "resources"), "spiresight/resources"),
 ]
 
 a = Analysis(
-    ["src/spiresight/__main__.py"],
-    pathex=["src"],
+    [os.path.join(ROOT, "src", "spiresight", "__main__.py")],
+    pathex=[os.path.join(ROOT, "src")],
     binaries=[],
     datas=datas,
     hiddenimports=[
