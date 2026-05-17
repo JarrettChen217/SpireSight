@@ -41,7 +41,7 @@ class _Thumbnail(QFrame):
         self.setStyleSheet("background-color: #2a2a2a; border: 1px solid #444;")
 
         pix = QPixmap()
-        pix.loadFromData(png, b"PNG")
+        pix.loadFromData(png)
         scaled = pix.scaled(
             QSize(64, 36),
             Qt.AspectRatioMode.KeepAspectRatio,
