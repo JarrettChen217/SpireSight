@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from spiresight.prompts.ui_locale import UILocale
-from spiresight.ui.state.screenshot_store import ScreenshotBundle, ScreenshotStore
+from spiresight.ui.state.screenshot_store import ScreenshotStore
 
 
 class ScreenshotTab(QWidget):

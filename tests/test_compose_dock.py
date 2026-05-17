@@ -1,8 +1,6 @@
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication
 
 from spiresight.prompts.ui_locale import UILocale

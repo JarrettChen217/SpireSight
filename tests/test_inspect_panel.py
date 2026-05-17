@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 import pytest
