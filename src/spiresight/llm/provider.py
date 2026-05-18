@@ -29,7 +29,7 @@ class LLMProvider(Protocol):
         model: str,
         system: str,
         user_text: str = "",
-        images: list[bytes] = (),
+        images: list[bytes] = (),  # type: ignore[assignment]
         messages: list | None = None,   # list[Message], deferred import
         cancel_event: threading.Event = None,  # type: ignore[assignment]
         json_mode: bool = False,

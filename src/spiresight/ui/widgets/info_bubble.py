@@ -145,6 +145,10 @@ class InfoBubble(QWidget):
         ir.addWidget(send_btn)
         root.addWidget(input_row)
 
+        # tail pointer — overlay widget at top-center, pointing up toward mini-bar
+        self._tail = _TailWidget(self)
+        self._tail.move((BUBBLE_WIDTH - TAIL_SIZE) // 2, -TAIL_SIZE)
+
         self.resize(BUBBLE_WIDTH, 100)
 
     # public API
@@ -155,8 +159,11 @@ class InfoBubble(QWidget):
         self._cancel_btn.hide()
         self._streaming = False
         for i in reversed(range(self._body_layout.count())):
-            w = self._body_layout.itemAt(i).widget()
-            if w is not self._output:
+            item = self._body_layout.itemAt(i)
+            if item is None:
+                continue
+            w = item.widget()
+            if w is not None and w is not self._output:
                 w.deleteLater()
 
     def append_user_message(self, text: str) -> None:

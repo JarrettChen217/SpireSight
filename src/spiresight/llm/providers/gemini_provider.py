@@ -23,7 +23,7 @@ class GeminiProvider:
         model: str,
         system: str,
         user_text: str = "",
-        images: list[bytes] = (),
+        images: list[bytes] = (),  # type: ignore[assignment]
         cancel_event: threading.Event | None = None,
         json_mode: bool = False,
         messages: list | None = None,

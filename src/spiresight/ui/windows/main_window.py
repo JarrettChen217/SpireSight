@@ -642,7 +642,7 @@ class MainWindow(QMainWindow):
             self._bubble.set_streaming(True)
         else:
             self._tabs.setCurrentIndex(_TAB_CHAT)
-            self._chat_tab.reset()
+            self._render_conversation()
 
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
@@ -664,12 +664,13 @@ class MainWindow(QMainWindow):
         self._worker.start()
 
     def _on_follow_up_finished(self) -> None:
-        self._chat_tab.finalize()
         self._compose.set_streaming(False)
         self.statusBar().showMessage("Done.", 3000)
 
-        if self._bubble is not None:
+        if self._bubble is not None and self._config.mini_bar_mode:
             self._bubble.finalize()
+        else:
+            self._render_conversation()
 
         full_markdown = "".join(self._stream_buffer)
 
