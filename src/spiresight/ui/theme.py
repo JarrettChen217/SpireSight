@@ -26,6 +26,10 @@ USAGE_COLORS = {
     "light_running": "#fbbf24",   # amber-400
     "light_ok": "#4ade80",        # green-400
     "light_error": "#f87171",     # red-400
+    "log_sent": "#888888",
+    "log_ok": "",
+    "log_error": "#d65a5a",
+    "log_cancelled": "#666666",
 }
 
 
