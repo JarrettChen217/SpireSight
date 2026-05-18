@@ -18,15 +18,10 @@ dependencies = [
   "PyYAML>=6.0",
   "Pillow>=10.0",
   "Pygments>=2.17",
+  "openai>=1.50.0",
+  "anthropic>=0.40.0",
+  "google-genai>=1.0.0",
 ]
-# NOTE: Spec §3 names the `openai` SDK as the MVP LLM library. The
-# implementation in src/spiresight/llm/providers/openai_provider.py
-# instead talks to the OpenAI API via httpx directly. This gives us
-# fine-grained cancellation between SSE chunks (the SDK's streaming
-# iterator isn't friendly to mid-stream aborts from another thread).
-# The external behavior — endpoint, payload, error mapping — matches
-# what the SDK would produce. Swap-in is a one-file change if priorities
-# shift.
 
 [project.optional-dependencies]
 dev = [
