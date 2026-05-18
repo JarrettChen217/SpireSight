@@ -5,7 +5,7 @@ import pytest
 from PySide6.QtCore import QCoreApplication
 
 from spiresight.config.schema import AppConfig, ProviderConfig
-from spiresight.core.request import InferenceRequest
+from spiresight.core.request import QuickActionRequest
 from spiresight.core.runner import InferenceRunner
 from spiresight.core.run_state import Card, RunState
 from spiresight.llm.capabilities import Capability
@@ -31,9 +31,11 @@ class _FakeProvider:
         self._chunks = chunks
         self.last_call: dict | None = None
     def list_models(self): return self._models
-    def stream(self, *, model, system, user_text, images, cancel_event, json_mode=False):
+    def stream(self, *, model, system, user_text="", images=(), cancel_event=None, json_mode=False, messages=None):
+        if cancel_event is None:
+            cancel_event = threading.Event()
         self.last_call = dict(model=model, system=system, user_text=user_text,
-                              images=images, json_mode=json_mode)
+                              images=images, json_mode=json_mode, messages=messages)
         yield from self._chunks
 
 
@@ -63,8 +65,8 @@ def test_run_streams_text_with_image_when_required():
         chunks=[StreamChunk("Hello"), StreamChunk(" world", "stop")],
     )
     runner = _runner(provider=provider, loader=_FakeLoader(qa, sp))
-    out = list(runner.run(
-        InferenceRequest(prompt_id="card", custom_text="extra", include_screenshot=True),
+    out = list(runner.run_quick_action(
+        QuickActionRequest(prompt_id="card", custom_text="extra", include_screenshot=True),
         cancel_event=threading.Event(),
     ))
     assert "".join(c.text_delta for c in out) == "Hello world"
@@ -85,7 +87,7 @@ def test_run_omits_image_when_screenshot_unchecked():
         chunks=[StreamChunk("ok", "stop")],
     )
     runner = _runner(provider=provider, loader=_FakeLoader(qa, sp))
-    list(runner.run(InferenceRequest("x", "", include_screenshot=False),
+    list(runner.run_quick_action(QuickActionRequest("x", "", include_screenshot=False),
                     cancel_event=threading.Event()))
     assert provider.last_call["images"] == []
 
@@ -109,8 +111,8 @@ def test_capability_pre_flight_blocks_non_vision_model():
         screen_capture=_FakeCapture(),
     )
     with pytest.raises(MissingCapabilityError) as exc:
-        list(runner.run(
-            InferenceRequest("x", "", include_screenshot=True),
+        list(runner.run_quick_action(
+            QuickActionRequest("x", "", include_screenshot=True),
             cancel_event=threading.Event(),
         ))
     assert exc.value.missing == {Capability.VISION}
@@ -132,7 +134,7 @@ def test_missing_api_key_raises():
         provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
     )
     with pytest.raises(MissingAPIKey):
-        list(runner.run(InferenceRequest("x", "", False), cancel_event=threading.Event()))
+        list(runner.run_quick_action(QuickActionRequest("x", "", False), cancel_event=threading.Event()))
 
 
 @pytest.fixture(scope="module")
@@ -170,7 +172,7 @@ def test_run_appends_run_state_block_to_system_when_store_has_state(qapp):
         inspected_at=datetime(2026, 5, 16, tzinfo=timezone.utc),
     ))
     runner = _stateful_runner(provider, _FakeLoader(qa, sp), _FakeCapture(), store)
-    list(runner.run(InferenceRequest("x", "", False), cancel_event=threading.Event()))
+    list(runner.run_quick_action(QuickActionRequest("x", "", False), cancel_event=threading.Event()))
     assert provider.last_call["system"].startswith("base prompt")
     assert "## Current Run Context" in provider.last_call["system"]
     assert "Heavy Blade+" in provider.last_call["system"]
@@ -188,7 +190,7 @@ def test_run_leaves_system_unchanged_when_store_empty(qapp):
     )
     store = RunStateStore()  # empty
     runner = _stateful_runner(provider, _FakeLoader(qa, sp), _FakeCapture(), store)
-    list(runner.run(InferenceRequest("x", "", False), cancel_event=threading.Event()))
+    list(runner.run_quick_action(QuickActionRequest("x", "", False), cancel_event=threading.Event()))
     assert provider.last_call["system"] == "base prompt"
 
 
@@ -202,7 +204,7 @@ def test_run_without_store_works_unchanged():
         chunks=[StreamChunk("ok", "stop")],
     )
     runner = _runner(provider=provider, loader=_FakeLoader(qa, sp))  # no store
-    list(runner.run(InferenceRequest("x", "", False), cancel_event=threading.Event()))
+    list(runner.run_quick_action(QuickActionRequest("x", "", False), cancel_event=threading.Event()))
     assert provider.last_call["system"] == "base prompt"
 
 
