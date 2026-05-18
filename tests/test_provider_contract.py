@@ -12,7 +12,9 @@ from spiresight.llm.errors import (
     AuthError,
     RateLimitError,
     NetworkError,
+    RequestTimeoutError,
 )
+from spiresight.llm.provider import ProviderOptions
 
 
 class _Fake:
@@ -48,6 +50,28 @@ def test_missing_capability_carries_missing_set():
     assert "gpt-3.5-turbo" in str(err)
     assert err.model == "gpt-3.5-turbo"
     assert err.missing == {Capability.VISION}
+
+
+def test_provider_options_defaults():
+    opts = ProviderOptions()
+    assert opts.request_timeout_seconds == 180
+
+
+def test_provider_options_frozen():
+    import dataclasses
+    opts = ProviderOptions(request_timeout_seconds=60)
+    assert opts.request_timeout_seconds == 60
+    try:
+        opts.request_timeout_seconds = 30  # type: ignore[misc]
+    except dataclasses.FrozenInstanceError:
+        return
+    raise AssertionError("ProviderOptions should be frozen")
+
+
+def test_request_timeout_error_is_network_error():
+    exc = RequestTimeoutError("Request exceeded 60s timeout (elapsed 61.2s)")
+    assert isinstance(exc, NetworkError)
+    assert "60s" in str(exc)
 
 
 def test_streaming_via_protocol_consumes_chunks():
