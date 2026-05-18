@@ -98,3 +98,14 @@ class ProviderPicker(QWidget):
             self._provider_box.currentData() or "",
             self._model_box.currentData() or "",
         )
+
+    def reload(self, config) -> None:
+        """Repopulate model dropdown from the given AppConfig's active provider."""
+        name = config.active_provider
+        idx = self._provider_box.findData(name)
+        if idx >= 0:
+            self._provider_box.setCurrentIndex(idx)
+        self._reload_models()
+        midx = self._model_box.findData(config.active_model)
+        if midx >= 0:
+            self._model_box.setCurrentIndex(midx)
