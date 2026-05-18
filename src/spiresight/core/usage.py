@@ -120,6 +120,31 @@ def _is_non_negative_number(v: object) -> TypeGuard[int | float]:
     return isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0
 
 
+LogStatus = Literal["sent", "ok", "error", "cancelled", "timeout"]
+
+
+@dataclass(frozen=True)
+class LoggedMessage:
+    role: Literal["system", "user", "assistant"]
+    text: str
+    image_summary: str | None  # e.g. "PNG, 245 KB, 1920×1080"; None when no image
+
+
+@dataclass
+class RequestLog:
+    correlation_id: str          # uuid4().hex[:8]
+    timestamp: datetime          # UTC, when request_logged is emitted
+    provider: str                # "openai" | "anthropic" | "gemini"
+    model: str
+    system: str                  # final composed system prompt
+    messages: list[LoggedMessage]
+    params: dict[str, object]    # provider-agnostic display dict
+    response: str = ""
+    status: LogStatus = "sent"
+    error: str | None = None
+    finished_at: datetime | None = None
+
+
 Status = Literal["idle", "running", "ok", "error"]
 _MAX_RECORDS = 200
 
