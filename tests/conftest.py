@@ -1,9 +1,14 @@
+import os
 import sys
 import types
 from pathlib import Path
 
 import pytest
 from PySide6.QtWidgets import QApplication
+
+# Force offscreen rendering so tests run headless everywhere (CI and pre-commit).
+# setdefault keeps any explicit override from the caller's environment.
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 SRC = Path(__file__).resolve().parents[1] / "src"
 if str(SRC) not in sys.path:
