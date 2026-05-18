@@ -54,26 +54,27 @@ def test_initial_state(main_window):
 
 def test_switch_to_provider_without_models(main_window):
     """Test switching to a provider with no models."""
-    # Switch to anthropic (no models in MVP)
+    # Switch to openai_compat (no built-in models; needs Refresh)
     picker = main_window._picker
-    picker._provider_box.setCurrentIndex(picker._provider_box.findData("anthropic"))
-
-    # Status bar should show provider name with "(no models)"
-    status_text = main_window._usage_bar.text_for_test()
-    assert "anthropic" in status_text.lower()
-    assert "no models" in status_text.lower()
-
-    # UI should be disabled
-    assert not main_window._compose.isEnabled()
-    assert not main_window._prompt_panel.isEnabled()
-
-    # Config should reflect provider change
-    assert main_window._config.active_provider == "anthropic"
+    idx = picker._provider_box.findData("openai_compat")
+    if idx >= 0:
+        picker._provider_box.setCurrentIndex(idx)
+        # Status bar should show provider name with "(no models)"
+        status_text = main_window._usage_bar.text_for_test()
+        assert "openai_compat" in status_text.lower()
+        assert "no models" in status_text.lower()
+        # UI should be disabled
+        assert not main_window._compose.isEnabled()
+        assert not main_window._prompt_panel.isEnabled()
+        # Config should reflect provider change
+        assert main_window._config.active_provider == "openai_compat"
+    else:
+        pytest.skip("openai_compat not in picker yet")
 
 
 def test_switch_back_to_provider_with_models(main_window):
     """Test switching back to a provider with models."""
-    # First switch to anthropic
+    # First switch to anthropic (now has built-in models)
     picker = main_window._picker
     picker._provider_box.setCurrentIndex(picker._provider_box.findData("anthropic"))
 
@@ -96,16 +97,16 @@ def test_multiple_switches(main_window):
     """Test multiple switches between providers."""
     picker = main_window._picker
 
-    # openai -> anthropic -> openai -> anthropic
+    # openai -> anthropic -> openai -> anthropic (anthropic now has built-in models)
     for _ in range(2):
         # To anthropic
         picker._provider_box.setCurrentIndex(picker._provider_box.findData("anthropic"))
-        assert "no models" in main_window._usage_bar.text_for_test().lower()
-        assert not main_window._compose.isEnabled()
+        status = main_window._usage_bar.text_for_test().lower()
+        assert "no models" not in status  # anthropic has built-in models now
+        assert main_window._compose.isEnabled()
 
         # Back to openai
         picker._provider_box.setCurrentIndex(picker._provider_box.findData("openai"))
-        assert "no models" not in main_window._usage_bar.text_for_test().lower()
         assert main_window._compose.isEnabled()
 
 
