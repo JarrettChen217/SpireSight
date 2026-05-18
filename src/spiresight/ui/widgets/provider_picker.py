@@ -1,9 +1,10 @@
-# src/spiresight/ui/widgets/provider_picker.py
 """Provider + model dropdowns with capability badges.
 
 Emits selection_changed(provider_name, model_id) when either changes.
 """
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
@@ -13,12 +14,16 @@ from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import MissingBaseURL
 from spiresight.config.schema import ProviderConfig
 
+if TYPE_CHECKING:
+    from spiresight.config.schema import AppConfig
+
 
 class ProviderPicker(QWidget):
     selection_changed = Signal(str, str)  # provider, model_id
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, config: AppConfig | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._config = config
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
@@ -56,11 +61,17 @@ class ProviderPicker(QWidget):
         if midx >= 0:
             self._model_box.setCurrentIndex(midx)
 
+    def _provider_config(self, name: str) -> ProviderConfig:
+        """Return the stored ProviderConfig for *name*, or an empty default."""
+        if self._config is not None:
+            return self._config.providers.get(name, ProviderConfig())
+        return ProviderConfig()
+
     def _reload_models(self) -> None:
         self._model_box.clear()
         name = self._provider_box.currentData()
         try:
-            provider = registry.get(name, ProviderConfig())
+            provider = registry.get(name, self._provider_config(name))
             models = provider.list_models()
         except MissingBaseURL:
             models = []
@@ -79,7 +90,7 @@ class ProviderPicker(QWidget):
             self._badge.setVisible(False)
             return
         try:
-            provider = registry.get(name, ProviderConfig())
+            provider = registry.get(name, self._provider_config(name))
             models = provider.list_models()
         except MissingBaseURL:
             self._badge.setVisible(False)
@@ -99,8 +110,9 @@ class ProviderPicker(QWidget):
             self._model_box.currentData() or "",
         )
 
-    def reload(self, config) -> None:
+    def reload(self, config: AppConfig) -> None:
         """Repopulate model dropdown from the given AppConfig's active provider."""
+        self._config = config
         name = config.active_provider
         idx = self._provider_box.findData(name)
         if idx >= 0:

@@ -99,7 +99,7 @@ class MainWindow(QMainWindow):
         self._apply_always_on_top()
 
         # ── sidebar ──
-        self._picker = ProviderPicker()
+        self._picker = ProviderPicker(config)
         self._picker.set_active(config.active_provider, config.active_model)
         self._picker.selection_changed.connect(self._on_picker_changed)
 
