@@ -439,3 +439,20 @@ QToolButton#pin-button {
 QToolButton#pin-button:checked {
     color: #d4a54a;
 }
+
+/* ── LogRow ─────────────────────────────────────────────────── */
+
+QFrame#LogRow { background: transparent; }
+QFrame#LogRow QLabel#LogRowSummary {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11.5px;
+}
+QFrame#LogRow[status="sent"]      QLabel#LogRowSummary { color: #888888; }
+QFrame#LogRow[status="ok"]        QLabel#LogRowSummary { color: palette(text); }
+QFrame#LogRow[status="error"]     QLabel#LogRowSummary { color: #d65a5a; }
+QFrame#LogRow[status="timeout"]   QLabel#LogRowSummary { color: #d65a5a; }
+QFrame#LogRow[status="cancelled"] QLabel#LogRowSummary { color: #666666; }
+QFrame#LogRow QPlainTextEdit {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px;
+}

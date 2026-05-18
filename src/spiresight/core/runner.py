@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -18,7 +19,7 @@ from spiresight.core.run_state import RunState
 from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import MissingAPIKey, MissingCapabilityError
 from spiresight.llm.models import ModelInfo
-from spiresight.llm.provider import LLMProvider, StreamChunk
+from spiresight.llm.provider import LLMProvider, ProviderOptions, StreamChunk
 from spiresight.prompts.loader import PromptLoader
 
 INSPECTOR_PROMPT_ID = "sts_inspector"
@@ -42,7 +43,17 @@ def _load_guard_prompt() -> str:
         "If you lack needed information, say so explicitly."
     )
 
-ProviderFactory = Callable[[str, ProviderConfig], LLMProvider]
+
+ProviderFactory = Callable[[str, ProviderConfig, ProviderOptions], LLMProvider]
+
+
+@dataclass(frozen=True)
+class RequestSnapshot:
+    provider: str
+    model: str
+    system: str
+    messages: tuple[Message, ...]
+    params: dict[str, object]
 
 
 class CaptureSource(Protocol):
@@ -77,31 +88,93 @@ class InferenceRunner:
             return base
         return f"{base}\n\n{state.to_prompt_block()}"
 
-    def inspect(self, *, images: list[bytes], cancel_event: threading.Event) -> RunState:
-        """Send N pre-captured PNG frames to the inspector prompt, parse RunState."""
-        if not images:
-            raise ValueError("inspect requires at least one frame")
-
-        sp = self._loader.get_system_prompt(INSPECTOR_PROMPT_ID)
-
+    def _get_provider_and_model(self):
         provider_cfg = self._config.providers.get(
             self._config.active_provider, ProviderConfig()
         )
         if not provider_cfg.api_key:
             raise MissingAPIKey(self._config.active_provider)
-        provider = self._factory(self._config.active_provider, provider_cfg)
-
+        options = ProviderOptions(
+            request_timeout_seconds=self._config.request_timeout_seconds,
+        )
+        provider = self._factory(self._config.active_provider, provider_cfg, options)
         model = self._resolve_model(provider, self._config.active_model)
+        return provider, model
+
+    # ── snapshot methods ────────────────────────────────────────────────────
+
+    def snapshot_quick_action(self, request: QuickActionRequest) -> RequestSnapshot:
+        qa = self._loader.get_quick_action(request.prompt_id)
+        sp = self._loader.get_system_prompt(qa.system_prompt_id)
+        user_text = qa.user_template.format(custom_text=request.custom_text or "")
+        image_png: bytes | None = None
+        if qa.requires_screenshot and request.include_screenshot:
+            image_png = self._capture.grab_primary()
+        provider, model = self._get_provider_and_model()
+        return RequestSnapshot(
+            provider=provider.name,
+            model=model.id,
+            system=self._compose_system(sp.content),
+            messages=(Message(role="user", text=user_text, image_png=image_png),),
+            params={"json_mode": False, "has_images": image_png is not None},
+        )
+
+    def snapshot_follow_up(
+        self,
+        request: FollowUpRequest,
+        history: tuple[Message, ...],
+    ) -> RequestSnapshot:
+        guard = _load_guard_prompt()
+        image_png: bytes | None = None
+        if request.recapture:
+            image_png = self._capture.grab_primary()
+        elif request.include_screenshot:
+            for m in reversed(history):
+                if m.role == "user" and m.image_png is not None:
+                    image_png = m.image_png
+                    break
+        user_msg = Message(role="user", text=request.user_text, image_png=image_png)
+        provider, model = self._get_provider_and_model()
+        return RequestSnapshot(
+            provider=provider.name,
+            model=model.id,
+            system=guard,
+            messages=tuple(history) + (user_msg,),
+            params={"json_mode": False, "has_images": image_png is not None},
+        )
+
+    def snapshot_inspect(self, images: list[bytes]) -> RequestSnapshot:
+        if not images:
+            raise ValueError("inspect requires at least one frame")
+        sp = self._loader.get_system_prompt(INSPECTOR_PROMPT_ID)
+        provider, model = self._get_provider_and_model()
+        msgs = tuple(
+            Message(role="user", text=INSPECTOR_USER_TEXT, image_png=img) for img in images
+        )
+        return RequestSnapshot(
+            provider=provider.name,
+            model=model.id,
+            system=sp.content,
+            messages=msgs,
+            params={"json_mode": True, "has_images": True, "image_count": len(images)},
+        )
+
+    # ── run methods ─────────────────────────────────────────────────────────
+
+    def inspect(self, *, images: list[bytes], cancel_event: threading.Event) -> RunState:
+        """Send N pre-captured PNG frames to the inspector prompt, parse RunState."""
+        snap = self.snapshot_inspect(images)
+        provider, model = self._get_provider_and_model()
         missing = _INSPECT_CAPS - set(model.capabilities)
         if missing:
             raise MissingCapabilityError(model=model.id, missing=set(missing))
 
         buffer: list[str] = []
         for chunk in provider.stream(
-            model=model.id,
-            system=sp.content,
+            model=snap.model,
+            system=snap.system,
             user_text=INSPECTOR_USER_TEXT,
-            images=images,
+            images=[m.image_png for m in snap.messages if m.image_png is not None],
             cancel_event=cancel_event,
             json_mode=True,
         ):
@@ -118,41 +191,26 @@ class InferenceRunner:
                 f"Inspector returned unparseable JSON: {raw[:200]}"
             ) from exc
 
-    def _get_provider_and_model(self):
-        provider_cfg = self._config.providers.get(
-            self._config.active_provider, ProviderConfig()
-        )
-        if not provider_cfg.api_key:
-            raise MissingAPIKey(self._config.active_provider)
-        provider = self._factory(self._config.active_provider, provider_cfg)
-        model = self._resolve_model(provider, self._config.active_model)
-        return provider, model
-
     def run_quick_action(
         self,
         request: QuickActionRequest,
         *,
         cancel_event: threading.Event,
     ) -> Iterator[StreamChunk]:
-        qa = self._loader.get_quick_action(request.prompt_id)
-        sp = self._loader.get_system_prompt(qa.system_prompt_id)
-        user_text = qa.user_template.format(custom_text=request.custom_text or "")
-
+        snap = self.snapshot_quick_action(request)
         provider, model = self._get_provider_and_model()
+        qa = self._loader.get_quick_action(request.prompt_id)
         missing = set(qa.required_capabilities) - set(model.capabilities)
         if missing:
             raise MissingCapabilityError(model=model.id, missing=missing)
-
-        image_png: bytes | None = None
-        if qa.requires_screenshot and request.include_screenshot:
-            image_png = self._capture.grab_primary()
-
+        msg = snap.messages[0]
         yield from provider.stream(
-            model=model.id,
-            system=self._compose_system(sp.content),
-            user_text=user_text,
-            images=[image_png] if image_png is not None else [],
+            model=snap.model,
+            system=snap.system,
+            user_text=msg.text,
+            images=[msg.image_png] if msg.image_png is not None else [],
             cancel_event=cancel_event,
+            json_mode=snap.params.get("json_mode", False),
         )
 
     def run_follow_up(
@@ -162,26 +220,12 @@ class InferenceRunner:
         *,
         cancel_event: threading.Event,
     ) -> Iterator[StreamChunk]:
-        guard = _load_guard_prompt()
-
-        image_png: bytes | None = None
-        if request.recapture:
-            image_png = self._capture.grab_primary()
-        elif request.include_screenshot:
-            for m in reversed(history):
-                if m.role == "user" and m.image_png is not None:
-                    image_png = m.image_png
-                    break
-
-        user_msg = Message(role="user", text=request.user_text, image_png=image_png)
-        messages = list(history) + [user_msg]
-
-        provider, model = self._get_provider_and_model()
-
+        snap = self.snapshot_follow_up(request, history)
+        provider, _ = self._get_provider_and_model()
         yield from provider.stream(
-            model=model.id,
-            system=guard,
-            messages=messages,
+            model=snap.model,
+            system=snap.system,
+            messages=list(snap.messages),
             cancel_event=cancel_event,
         )
 

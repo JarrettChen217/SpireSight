@@ -61,6 +61,22 @@ logs:
   empty: "暂无事件。"
   copy_all: "复制全部"
   clear: "清空"
+  section:
+    system: "System prompt"
+    messages: "Messages"
+    params: "Params"
+    response: "Response"
+  streaming_placeholder: "[流式中…]"
+  copy_row: "复制"
+  status:
+    sent: "sent"
+    ok: "ok"
+    error: "error"
+    cancelled: "cancelled"
+    timeout: "timeout"
+
+settings:
+  request_timeout_label: "请求超时（秒）"
 
 usage:
   tooltip:

@@ -35,3 +35,7 @@ class RateLimitError(LLMError):
 
 class NetworkError(LLMError):
     """Network failure or timeout."""
+
+
+class RequestTimeoutError(NetworkError):
+    """Provider read/connect timeout — raised when httpx.TimeoutException fires."""

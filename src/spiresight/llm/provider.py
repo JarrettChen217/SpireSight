@@ -10,6 +10,11 @@ from spiresight.core.usage import TokenUsage
 from .models import ModelInfo
 
 
+@dataclass(frozen=True)
+class ProviderOptions:
+    request_timeout_seconds: int = 180
+
+
 @dataclass
 class StreamChunk:
     text_delta: str

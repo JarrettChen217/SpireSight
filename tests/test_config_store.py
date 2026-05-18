@@ -55,3 +55,15 @@ def test_include_screenshot_default_defaults_to_true():
     from spiresight.config.schema import AppConfig
     cfg = AppConfig()
     assert cfg.include_screenshot_default is True
+
+
+def test_app_config_request_timeout_default():
+    from spiresight.config.schema import AppConfig
+    cfg = AppConfig()
+    assert cfg.request_timeout_seconds == 180
+
+
+def test_app_config_request_timeout_override():
+    from spiresight.config.schema import AppConfig
+    cfg = AppConfig(request_timeout_seconds=60)
+    assert cfg.request_timeout_seconds == 60

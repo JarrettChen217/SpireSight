@@ -18,9 +18,9 @@ import httpx
 from spiresight.config.schema import ProviderConfig
 from spiresight.core.usage import TokenUsage
 from spiresight.llm.capabilities import Capability
-from spiresight.llm.errors import AuthError, MissingAPIKey, NetworkError, RateLimitError
+from spiresight.llm.errors import AuthError, MissingAPIKey, NetworkError, RateLimitError, RequestTimeoutError
 from spiresight.llm.models import ModelInfo
-from spiresight.llm.provider import StreamChunk
+from spiresight.llm.provider import ProviderOptions, StreamChunk
 
 _DEFAULT_BASE: Final = "https://api.openai.com/v1"
 
@@ -70,8 +70,9 @@ _MODELS: Final = [
 class OpenAIProvider:
     name = "openai"
 
-    def __init__(self, config: ProviderConfig) -> None:
+    def __init__(self, config: ProviderConfig, options: ProviderOptions | None = None) -> None:
         self._config = config
+        self._options = options or ProviderOptions()
 
     def list_models(self) -> list[ModelInfo]:
         return list(_MODELS)
@@ -117,8 +118,9 @@ class OpenAIProvider:
             "Accept": "text/event-stream",
         }
 
+        timeout = httpx.Timeout(self._options.request_timeout_seconds, connect=15.0)
         try:
-            with httpx.Client(timeout=httpx.Timeout(60.0, connect=10.0)) as client:
+            with httpx.Client(timeout=timeout) as client:
                 with client.stream("POST", url, json=payload, headers=headers) as resp:
                     if resp.status_code == 401:
                         raise AuthError("Invalid OpenAI API key")
@@ -129,7 +131,12 @@ class OpenAIProvider:
                         body = resp.read().decode(errors="replace")
                         raise NetworkError(f"OpenAI HTTP {resp.status_code}: {body[:200]}")
                     yield from self._parse_sse(resp, cancel_event)
-        except (httpx.ConnectError, httpx.ReadError, httpx.TimeoutException) as exc:
+        except httpx.TimeoutException as exc:
+            raise RequestTimeoutError(
+                f"Request exceeded {self._options.request_timeout_seconds}s timeout "
+                f"({type(exc).__name__})"
+            ) from exc
+        except (httpx.ConnectError, httpx.ReadError) as exc:
             raise NetworkError(str(exc)) from exc
 
     @staticmethod

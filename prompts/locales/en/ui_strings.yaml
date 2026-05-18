@@ -61,6 +61,22 @@ logs:
   empty: "No events recorded."
   copy_all: "Copy all"
   clear: "Clear"
+  section:
+    system: "System prompt"
+    messages: "Messages"
+    params: "Params"
+    response: "Response"
+  streaming_placeholder: "[streaming…]"
+  copy_row: "Copy"
+  status:
+    sent: "sent"
+    ok: "ok"
+    error: "error"
+    cancelled: "cancelled"
+    timeout: "timeout"
+
+settings:
+  request_timeout_label: "Request timeout (seconds)"
 
 usage:
   tooltip:

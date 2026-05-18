@@ -17,3 +17,13 @@ def test_registry_returns_concrete_provider():
 def test_registry_unknown_raises_keyerror():
     with pytest.raises(KeyError):
         registry.get("nonesuch", ProviderConfig())
+
+
+def test_registry_builds_openai_with_options():
+    from spiresight.llm.provider import ProviderOptions
+
+    cfg = ProviderConfig(api_key="sk-test")
+    opts = ProviderOptions(request_timeout_seconds=42)
+    provider = registry.make_provider("openai", cfg, opts)
+    assert provider.name == "openai"
+    assert getattr(provider, "_options", None) is opts

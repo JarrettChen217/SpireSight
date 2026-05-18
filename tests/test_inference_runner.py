@@ -49,7 +49,7 @@ def _runner(*, provider, loader, capture=None):
     return InferenceRunner(
         config=cfg,
         prompt_loader=loader,
-        provider_factory=lambda name, pcfg: provider,
+        provider_factory=lambda name, pcfg, opts=None: provider,
         screen_capture=capture or _FakeCapture(),
     )
 
@@ -107,7 +107,7 @@ def test_capability_pre_flight_blocks_non_vision_model():
     runner = InferenceRunner(
         config=cfg,
         prompt_loader=_FakeLoader(qa, sp),
-        provider_factory=lambda n, p: provider,
+        provider_factory=lambda n, p, opts=None: provider,
         screen_capture=_FakeCapture(),
     )
     with pytest.raises(MissingCapabilityError) as exc:
@@ -131,7 +131,7 @@ def test_missing_api_key_raises():
     cfg.providers["openai"] = ProviderConfig(api_key="")
     runner = InferenceRunner(
         config=cfg, prompt_loader=_FakeLoader(qa, sp),
-        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+        provider_factory=lambda n, p, opts=None: provider, screen_capture=_FakeCapture(),
     )
     with pytest.raises(MissingAPIKey):
         list(runner.run_quick_action(QuickActionRequest("x", "", False), cancel_event=threading.Event()))
@@ -149,7 +149,7 @@ def _stateful_runner(provider, loader, capture, store):
     return InferenceRunner(
         config=cfg,
         prompt_loader=loader,
-        provider_factory=lambda name, pcfg: provider,
+        provider_factory=lambda name, pcfg, opts=None: provider,
         screen_capture=capture,
         run_state_store=store,
     )
@@ -232,7 +232,7 @@ def test_inspect_buffers_chunks_parses_json_returns_run_state():
     cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
     runner = InferenceRunner(
         config=cfg, prompt_loader=_StaticLoader(),
-        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+        provider_factory=lambda n, p, opts=None: provider, screen_capture=_FakeCapture(),
     )
 
     state = runner.inspect(images=[b"PNG_BYTES"], cancel_event=threading.Event())
@@ -258,7 +258,7 @@ def test_inspect_raises_value_error_on_malformed_json():
     cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
     runner = InferenceRunner(
         config=cfg, prompt_loader=_StaticLoader(),
-        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+        provider_factory=lambda n, p, opts=None: provider, screen_capture=_FakeCapture(),
     )
 
     with pytest.raises(ValueError):
@@ -280,7 +280,7 @@ def test_inspect_raises_missing_capability_when_model_lacks_json_mode():
     cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
     runner = InferenceRunner(
         config=cfg, prompt_loader=_StaticLoader(),
-        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+        provider_factory=lambda n, p, opts=None: provider, screen_capture=_FakeCapture(),
     )
 
     with pytest.raises(MissingCapabilityError) as exc:
@@ -308,7 +308,7 @@ def test_inspect_with_multiple_frames_passes_all_to_provider():
     cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
     runner = InferenceRunner(
         config=cfg, prompt_loader=_StaticLoader(),
-        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+        provider_factory=lambda n, p, opts=None: provider, screen_capture=_FakeCapture(),
     )
 
     state = runner.inspect(
@@ -334,7 +334,7 @@ def test_inspect_with_no_frames_raises_value_error():
     cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
     runner = InferenceRunner(
         config=cfg, prompt_loader=_StaticLoader(),
-        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+        provider_factory=lambda n, p, opts=None: provider, screen_capture=_FakeCapture(),
     )
 
     with pytest.raises(ValueError, match="at least one frame"):
@@ -398,7 +398,7 @@ def test_run_follow_up_recapture_grabs_new_screenshot():
     cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
     runner = InferenceRunner(
         config=cfg, prompt_loader=_FakeLoader(qa, sp),
-        provider_factory=lambda n, p: provider, screen_capture=capture,
+        provider_factory=lambda n, p, opts=None: provider, screen_capture=capture,
     )
 
     history = (Message(role="user", text="hi"),)
@@ -451,7 +451,7 @@ def test_run_follow_up_skips_capability_check():
     cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
     runner = InferenceRunner(
         config=cfg, prompt_loader=_FakeLoader(qa, sp),
-        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+        provider_factory=lambda n, p, opts=None: provider, screen_capture=_FakeCapture(),
     )
     req = FollowUpRequest(user_text="hello")
     # Should NOT raise MissingCapabilityError
