@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-    QLineEdit, QTabWidget, QVBoxLayout, QWidget,
+    QLineEdit, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from spiresight.config.schema import AppConfig, ProviderConfig
@@ -60,9 +60,16 @@ class SettingsDialog(QDialog):
         self._on_top = QCheckBox()
         self._on_top.setChecked(self._config.always_on_top)
 
+        self._timeout = QSpinBox()
+        self._timeout.setRange(30, 600)
+        self._timeout.setSingleStep(30)
+        self._timeout.setValue(self._config.request_timeout_seconds)
+
         form.addRow("Language", self._lang)
         form.addRow("Hotkey", self._hotkey)
         form.addRow("Always on top", self._on_top)
+        # Settings dialog locale awareness is a follow-up; using English literal for now.
+        form.addRow("Request timeout (seconds)", self._timeout)
         return page
 
     def _apply_and_accept(self) -> None:
@@ -75,4 +82,5 @@ class SettingsDialog(QDialog):
         self._config.language = self._lang.currentData()
         self._config.hotkey = self._hotkey.text().strip() or self._config.hotkey
         self._config.always_on_top = self._on_top.isChecked()
+        self._config.request_timeout_seconds = self._timeout.value()
         self.accept()
