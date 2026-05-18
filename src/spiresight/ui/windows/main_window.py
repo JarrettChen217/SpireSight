@@ -236,6 +236,13 @@ class MainWindow(QMainWindow):
         if model_id:
             self._config.active_model = model_id
             self._usage_bar.set_model_label(model_id)
+            self._compose.setEnabled(True)
+            self._prompt_panel.setEnabled(True)
+        else:
+            # Provider has no models - show provider name and disable actions
+            self._usage_bar.set_model_label(f"{provider} (no models)")
+            self._compose.setEnabled(False)
+            self._prompt_panel.setEnabled(False)
         self._store.save(self._config)
         self._refresh_inspect_availability()
 
