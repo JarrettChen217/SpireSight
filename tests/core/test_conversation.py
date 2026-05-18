@@ -58,3 +58,20 @@ def test_last_screenshot_skips_assistant_images():
     store.append(Message(role="user", text="q", image_png=b"\x89PNGu"))
     store.append(Message(role="assistant", text="a"))
     assert store.last_screenshot() == b"\x89PNGu"
+
+
+def test_append_emits_changed(qapp):
+    store = ConversationStore()
+    fired = []
+    store.changed.connect(lambda: fired.append(1))
+    store.append(Message(role="user", text="x"))
+    assert len(fired) == 1
+
+
+def test_clear_emits_changed(qapp):
+    store = ConversationStore()
+    store.append(Message(role="user", text="x"))
+    fired = []
+    store.changed.connect(lambda: fired.append(1))
+    store.clear()
+    assert len(fired) == 1
