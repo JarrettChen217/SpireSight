@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 from PySide6.QtWidgets import QApplication
 
+from spiresight.core.usage import CallRecord, TokenUsage
 from spiresight.prompts.ui_locale import UILocale
 from spiresight.ui.tabs.logs_tab import LogsTab
 
@@ -56,11 +58,6 @@ def test_ring_buffer_caps_at_200(qtwidgets_app, locale):
     # oldest evicted: line-0 not present
     assert "line-0\n" not in tab._view.toPlainText()
     assert "line-49" not in tab._view.toPlainText()
-
-
-from datetime import datetime, timezone
-
-from spiresight.core.usage import CallRecord, TokenUsage
 
 
 def _record(model: str = "gpt-4o", in_t: int = 312, out_t: int = 421,

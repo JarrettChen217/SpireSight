@@ -1,5 +1,6 @@
 # tests/test_openai_provider.py
 import base64
+import json as _json
 import threading
 
 import httpx
@@ -213,8 +214,6 @@ def test_build_user_content_three_images_preserves_order():
     for i, (part, expected_png) in enumerate(zip(result[1:], pngs), start=1):
         assert part["type"] == "image_url"
 
-
-import json as _json
 
 
 @respx.mock
