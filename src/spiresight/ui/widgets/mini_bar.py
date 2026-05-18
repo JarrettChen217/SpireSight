@@ -12,11 +12,14 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 from spiresight.prompts.loader import PromptLoader
 from spiresight.ui.theme import icon_path
+from spiresight.ui.widgets.pin_button import PinButton
 
 
 class MiniBar(QWidget):
     action_clicked = Signal(str)
     expand_requested = Signal()
+    moved = Signal(QPoint)          # NEW
+    pin_toggled = Signal(bool)      # NEW
 
     def __init__(self, loader: PromptLoader, hotkey_hint: str, *,
                  pinned: bool = True, parent=None) -> None:
@@ -39,14 +42,9 @@ class MiniBar(QWidget):
             row.addWidget(btn)
         row.addWidget(QLabel(hotkey_hint))
 
-        self._pin_btn = QPushButton()
-        self._pin_btn.setCheckable(True)
-        self._pin_btn.setChecked(pinned)
-        self._pin_btn.setIconSize(QSize(18, 18))
+        self._pin_btn = PinButton(pinned=pinned)
         self._pin_btn.setToolTip("Always on top")
-        self._pin_btn.setFixedSize(28, 24)
-        self._pin_btn.clicked.connect(self._toggle_pin)
-        self._update_pin_icon()
+        self._pin_btn.toggled.connect(self._on_pin_toggled)
         row.addWidget(self._pin_btn)
 
         expand = QPushButton("▭")
@@ -56,24 +54,23 @@ class MiniBar(QWidget):
 
     @property
     def is_pinned(self) -> bool:
-        return self._pinned
+        return self._pin_btn.isChecked()
 
-    def _toggle_pin(self) -> None:
-        self._pinned = not self._pinned
+    def set_pinned(self, pinned: bool) -> None:
+        self._pin_btn.setChecked(pinned)
+
+    def _on_pin_toggled(self, pinned: bool) -> None:
+        self._pinned = pinned
         geo = self.geometry()
         flags = self.windowFlags()
-        if self._pinned:
+        if pinned:
             flags |= Qt.WindowType.WindowStaysOnTopHint
         else:
             flags &= ~Qt.WindowType.WindowStaysOnTopHint
         self.setWindowFlags(flags)
         self.setGeometry(geo)
         self.show()
-        self._update_pin_icon()
-
-    def _update_pin_icon(self) -> None:
-        icon_name = "pin_filled" if self._pinned else "pin_outline"
-        self._pin_btn.setIcon(QIcon(icon_path(icon_name)))
+        self.pin_toggled.emit(pinned)
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
         if e.button() == Qt.MouseButton.LeftButton:
@@ -82,6 +79,7 @@ class MiniBar(QWidget):
     def mouseMoveEvent(self, e: QMouseEvent) -> None:
         if self._drag_offset is not None:
             self.move(e.globalPosition().toPoint() - self._drag_offset)
+            self.moved.emit(self.pos())
 
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:
         self._drag_offset = None

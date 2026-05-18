@@ -264,7 +264,7 @@ class MainWindow(QMainWindow):
             self._mini_bar.action_clicked.connect(self._on_action)
             self._mini_bar.expand_requested.connect(self._exit_mini_bar)
         elif self._mini_bar.is_pinned != self._config.always_on_top:
-            self._mini_bar._toggle_pin()
+            self._mini_bar.set_pinned(self._config.always_on_top)
         self.hide()
         self._mini_bar.show()
         self._config.mini_bar_mode = True
