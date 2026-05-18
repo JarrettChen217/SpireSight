@@ -18,6 +18,8 @@ ROOT = os.path.join(SPECPATH, "..")
 datas = [
     (os.path.join(ROOT, "prompts"), "prompts"),
     (os.path.join(ROOT, "src", "spiresight", "resources"), "spiresight/resources"),
+    (os.path.join(ROOT, "src", "spiresight", "ui", "markdown", "style.css"),
+     "spiresight/ui/markdown"),
 ]
 
 a = Analysis(
