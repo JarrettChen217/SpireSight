@@ -1,3 +1,6 @@
+import pytest
+from dataclasses import FrozenInstanceError
+
 from spiresight.core.messages import Message
 
 
@@ -23,11 +26,8 @@ def test_message_assistant():
 
 def test_message_immutable():
     m = Message(role="user", text="hi")
-    try:
-        m.text = "nope"  # type: ignore[misc]
-        assert False, "should have raised"
-    except Exception:
-        pass
+    with pytest.raises(FrozenInstanceError):
+        m.text = "nope"
 
 
 def test_message_equality():
