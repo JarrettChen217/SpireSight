@@ -18,6 +18,9 @@ class GeminiProvider:
     def list_models(self) -> list[ModelInfo]:
         return []
 
+    def fetch_remote_models(self) -> list[ModelInfo]:
+        raise NotImplementedError("Gemini provider is not implemented in MVP")
+
     def stream(
         self,
         *,

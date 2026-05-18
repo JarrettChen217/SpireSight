@@ -77,6 +77,9 @@ class OpenAIProvider:
     def list_models(self) -> list[ModelInfo]:
         return list(_MODELS)
 
+    def fetch_remote_models(self) -> list[ModelInfo]:
+        raise NotImplementedError("fetch_remote_models not implemented in httpx-based provider yet")
+
     def stream(
         self,
         *,

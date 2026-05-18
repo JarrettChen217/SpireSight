@@ -91,3 +91,10 @@ def test_streaming_via_protocol_consumes_chunks():
     ))
     assert "".join(c.text_delta for c in chunks) == "hi!"
     assert chunks[-1].finish_reason == "stop"
+
+
+def test_provider_protocol_includes_fetch_remote_models():
+    from spiresight.llm.provider import LLMProvider
+    import inspect
+    members = dict(inspect.getmembers(LLMProvider))
+    assert "fetch_remote_models" in members
