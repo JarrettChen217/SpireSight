@@ -52,6 +52,18 @@ class OutputView(QTextBrowser):
         self._flush_timer.stop()
         self._flush()
 
+    def append_user_message(self, text: str) -> None:
+        self._flush()
+        current = self.toHtml()
+        user_html = (
+            f'<div style="background-color:#10141e; border-left:2px solid #d4a54a; '
+            f'border-radius:0 4px 4px 0; padding:6px 10px; margin-bottom:8px; '
+            f'color:#6e7a89;">{text}</div>'
+        )
+        self.setHtml(current + user_html)
+        sb = self.verticalScrollBar()
+        sb.setValue(sb.maximum())
+
     def current_markdown(self) -> str:
         return "".join(self._buffer)
 
