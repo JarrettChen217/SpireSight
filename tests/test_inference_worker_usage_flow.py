@@ -5,10 +5,18 @@ import pytest
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication
 
+from spiresight.core.messages import Message
 from spiresight.core.request import QuickActionRequest
+from spiresight.core.runner import RequestSnapshot
 from spiresight.core.usage import CallRecord, TokenUsage
 from spiresight.llm.provider import StreamChunk
 from spiresight.ui.workers.inference_worker import InferenceWorker
+
+_FAKE_SNAP = RequestSnapshot(
+    provider="openai", model="gpt-4o", system="SYS",
+    messages=(Message(role="user", text="hi", image_png=None),),
+    params={"json_mode": False, "has_images": False},
+)
 
 
 @pytest.fixture(scope="module")
@@ -20,6 +28,9 @@ def qtwidgets_app():
 class _FakeRunner:
     def __init__(self, chunks: list[StreamChunk]) -> None:
         self._chunks = chunks
+
+    def snapshot_quick_action(self, request):
+        return _FAKE_SNAP
 
     def run_quick_action(self, request, *, cancel_event: threading.Event) -> Iterator[StreamChunk]:
         for c in self._chunks:
@@ -122,6 +133,9 @@ def test_worker_continues_iterating_past_finish_reason(qtwidgets_app):
 def test_worker_emits_cancelled_when_cancelled_mid_stream(qtwidgets_app):
     """A canceled run does not append a record."""
     class _SlowRunner:
+        def snapshot_quick_action(self, request):
+            return _FAKE_SNAP
+
         def run_quick_action(self, request, *, cancel_event: threading.Event):
             # Yield one chunk, then check cancel.
             yield StreamChunk(text_delta="partial")
@@ -152,6 +166,9 @@ def test_worker_emits_cancelled_when_cancelled_mid_stream(qtwidgets_app):
 
 def test_worker_emits_failed_on_exception(qtwidgets_app):
     class _BoomRunner:
+        def snapshot_quick_action(self, request):
+            return _FAKE_SNAP
+
         def run_quick_action(self, request, *, cancel_event: threading.Event):
             raise RuntimeError("boom")
             yield  # pragma: no cover  (make it a generator)
@@ -174,6 +191,9 @@ def test_for_follow_up_emits_usage_recorded(qtwidgets_app):
     from spiresight.core.messages import Message
 
     class _FollowUpRunner:
+        def snapshot_follow_up(self, request, history):
+            return _FAKE_SNAP
+
         def run_follow_up(self, request, history, *, cancel_event):
             yield StreamChunk(text_delta="follow-up response", finish_reason="stop")
             yield StreamChunk(text_delta="", usage=TokenUsage(10, 20))
