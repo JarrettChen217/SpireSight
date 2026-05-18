@@ -28,8 +28,9 @@ class LLMProvider(Protocol):
         *,
         model: str,
         system: str,
-        user_text: str,
-        images: list[bytes],
-        cancel_event: threading.Event,
+        user_text: str = "",
+        images: list[bytes] = (),
+        messages: list | None = None,   # list[Message], deferred import
+        cancel_event: threading.Event = None,  # type: ignore[assignment]
         json_mode: bool = False,
     ) -> Iterator[StreamChunk]: ...
