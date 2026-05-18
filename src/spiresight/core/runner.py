@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Protocol
 
 from spiresight.config.schema import AppConfig, ProviderConfig
-from spiresight.core.request import InferenceRequest
+from spiresight.core.messages import Message
+from spiresight.core.request import FollowUpRequest, QuickActionRequest
 from spiresight.core.run_state import RunState
 from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import MissingAPIKey, MissingCapabilityError
@@ -25,6 +27,20 @@ INSPECTOR_USER_TEXT = (
     "Output JSON only, matching the schema specified in the system prompt."
 )
 _INSPECT_CAPS = frozenset({Capability.VISION, Capability.JSON_MODE})
+
+
+def _load_guard_prompt() -> str:
+    """Locate prompts/guard.txt relative to the repo root."""
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "prompts" / "guard.txt"
+        if candidate.exists():
+            return candidate.read_text(encoding="utf-8").strip()
+    return (
+        "You are continuing a previous conversation. "
+        "Rely on prior assistant messages for context. "
+        "If you lack needed information, say so explicitly."
+    )
 
 ProviderFactory = Callable[[str, ProviderConfig], LLMProvider]
 
@@ -102,9 +118,19 @@ class InferenceRunner:
                 f"Inspector returned unparseable JSON: {raw[:200]}"
             ) from exc
 
-    def run(
+    def _get_provider_and_model(self):
+        provider_cfg = self._config.providers.get(
+            self._config.active_provider, ProviderConfig()
+        )
+        if not provider_cfg.api_key:
+            raise MissingAPIKey(self._config.active_provider)
+        provider = self._factory(self._config.active_provider, provider_cfg)
+        model = self._resolve_model(provider, self._config.active_model)
+        return provider, model
+
+    def run_quick_action(
         self,
-        request: InferenceRequest,
+        request: QuickActionRequest,
         *,
         cancel_event: threading.Event,
     ) -> Iterator[StreamChunk]:
@@ -112,14 +138,7 @@ class InferenceRunner:
         sp = self._loader.get_system_prompt(qa.system_prompt_id)
         user_text = qa.user_template.format(custom_text=request.custom_text or "")
 
-        provider_cfg = self._config.providers.get(
-            self._config.active_provider, ProviderConfig()
-        )
-        if not provider_cfg.api_key:
-            raise MissingAPIKey(self._config.active_provider)
-        provider = self._factory(self._config.active_provider, provider_cfg)
-
-        model = self._resolve_model(provider, self._config.active_model)
+        provider, model = self._get_provider_and_model()
         missing = set(qa.required_capabilities) - set(model.capabilities)
         if missing:
             raise MissingCapabilityError(model=model.id, missing=missing)
@@ -133,6 +152,36 @@ class InferenceRunner:
             system=self._compose_system(sp.content),
             user_text=user_text,
             images=[image_png] if image_png is not None else [],
+            cancel_event=cancel_event,
+        )
+
+    def run_follow_up(
+        self,
+        request: FollowUpRequest,
+        history: tuple[Message, ...],
+        *,
+        cancel_event: threading.Event,
+    ) -> Iterator[StreamChunk]:
+        guard = _load_guard_prompt()
+
+        image_png: bytes | None = None
+        if request.recapture:
+            image_png = self._capture.grab_primary()
+        elif request.include_screenshot:
+            for m in reversed(history):
+                if m.role == "user" and m.image_png is not None:
+                    image_png = m.image_png
+                    break
+
+        user_msg = Message(role="user", text=request.user_text, image_png=image_png)
+        messages = list(history) + [user_msg]
+
+        provider, model = self._get_provider_and_model()
+
+        yield from provider.stream(
+            model=model.id,
+            system=guard,
+            messages=messages,
             cancel_event=cancel_event,
         )
 
