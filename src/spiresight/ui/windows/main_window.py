@@ -99,7 +99,7 @@ class MainWindow(QMainWindow):
         self._apply_always_on_top()
 
         # ── sidebar ──
-        self._picker = ProviderPicker()
+        self._picker = ProviderPicker(config)
         self._picker.set_active(config.active_provider, config.active_model)
         self._picker.selection_changed.connect(self._on_picker_changed)
 
@@ -232,7 +232,7 @@ class MainWindow(QMainWindow):
 
     def _on_picker_changed(self, provider: str, model_id: str) -> None:
         if provider:
-            self._config.active_provider = provider
+            self._config.active_provider = provider  # type: ignore[assignment]
         if model_id:
             self._config.active_model = model_id
             self._usage_bar.set_model_label(model_id)
@@ -251,7 +251,9 @@ class MainWindow(QMainWindow):
         self._store.save(self._config)
 
     def _open_settings(self) -> None:
-        dlg = SettingsDialog(self._config, self)
+        dlg = SettingsDialog(self._config, self._store, self)
+        dlg.models_refreshed.connect(self._on_provider_models_refreshed)
+        dlg.models_refresh_failed.connect(self._on_provider_models_refresh_failed)
         if dlg.exec():
             self._store.save(self._config)
             self._loader.reload(language=self._config.language)
@@ -259,6 +261,16 @@ class MainWindow(QMainWindow):
             self._prompt_panel.rebuild()
             self._apply_always_on_top()
             self.show()
+
+    def _on_provider_models_refreshed(self, name: str) -> None:
+        cached = self._config.providers.get(name)
+        n = len(cached.cached_models) if cached else 0
+        self._logs_tab.log(f"Refreshed {name} models: {n} cached")
+        if name == self._config.active_provider:
+            self._picker.reload(self._config)
+
+    def _on_provider_models_refresh_failed(self, name: str, exc: Exception) -> None:
+        self._logs_tab.log(f"Refresh {name} failed: {exc}")
 
     def _toggle_mini_bar(self) -> None:
         if self._mini_bar is None:

@@ -14,6 +14,12 @@ class MissingAPIKey(LLMError):
         self.provider = provider
 
 
+class MissingBaseURL(LLMError):
+    def __init__(self, provider: str) -> None:
+        super().__init__(f"Provider '{provider}' requires base_url to be set in Settings")
+        self.provider = provider
+
+
 class MissingCapabilityError(LLMError):
     def __init__(self, *, model: str, missing: set[Capability]) -> None:
         names = ", ".join(sorted(c.value for c in missing))

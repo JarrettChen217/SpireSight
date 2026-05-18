@@ -28,6 +28,10 @@ class LLMProvider(Protocol):
 
     def list_models(self) -> list[ModelInfo]: ...
 
+    def fetch_remote_models(self) -> list[ModelInfo]:
+        """Fetch models from the upstream API. May raise LLMError on failure."""
+        ...
+
     def stream(
         self,
         *,

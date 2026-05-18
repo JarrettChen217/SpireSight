@@ -456,3 +456,44 @@ def test_run_follow_up_skips_capability_check():
     req = FollowUpRequest(user_text="hello")
     # Should NOT raise MissingCapabilityError
     list(runner.run_follow_up(req, (), cancel_event=threading.Event()))
+
+
+def test_inspect_rejects_model_without_json_mode(monkeypatch):
+    """A model whose KNOWN_MODEL_CAPS entry lacks JSON_MODE must raise."""
+    from spiresight.config.schema import ModelInfoDict
+    from spiresight.core.runner import InferenceRunner
+    from spiresight.llm.errors import MissingCapabilityError
+    from spiresight.llm.models import ModelInfo
+    from spiresight.llm.capabilities import Capability
+    from unittest.mock import MagicMock
+    import threading
+
+    cfg = AppConfig(
+        active_provider="openai_compat",
+        active_model="llama-3.3-70b-versatile",
+        request_timeout_seconds=60,
+    )
+    cfg.providers = {"openai_compat": ProviderConfig(
+        api_key="k", base_url="http://x/v1",
+        cached_models=[ModelInfoDict(
+            id="llama-3.3-70b-versatile", display_name="L",
+            capabilities=["tool_use"], context_window=8192,
+        )],
+    )}
+
+    fake_provider = MagicMock()
+    fake_provider.name = "openai_compat"
+    fake_provider.list_models.return_value = [
+        ModelInfo("llama-3.3-70b-versatile", "L", frozenset({Capability.TOOL_USE}), 8192)
+    ]
+
+    loader = MagicMock()
+    loader.get_system_prompt.return_value = MagicMock(content="INSPECT-SYS")
+
+    runner = InferenceRunner(
+        config=cfg, prompt_loader=loader,
+        provider_factory=lambda *a, **kw: fake_provider,
+        screen_capture=MagicMock(), run_state_store=None,
+    )
+    with pytest.raises(MissingCapabilityError):
+        runner.inspect(images=[b"\x89PNG"], cancel_event=threading.Event())
