@@ -1,4 +1,3 @@
-# src/spiresight/config/schema.py
 """Pydantic schemas for app and provider configuration.
 
 NOTE(security): ProviderConfig.api_key holds the key in plaintext.
@@ -12,15 +11,26 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class ModelInfoDict(BaseModel):
+    """JSON-serializable mirror of llm.models.ModelInfo for ProviderConfig."""
+    id: str
+    display_name: str
+    capabilities: list[Literal["vision", "tool_use", "json_mode", "thinking"]] = Field(
+        default_factory=list
+    )
+    context_window: int = 0
+
+
 class ProviderConfig(BaseModel):
     api_key: str = ""
     base_url: str | None = None
+    cached_models: list[ModelInfoDict] = Field(default_factory=list)
 
 
 class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
-    active_provider: str = "openai"
+    active_provider: Literal["openai", "openai_compat", "anthropic", "gemini"] = "openai"
     active_model: str = "gpt-4o"
     providers: dict[str, ProviderConfig] = Field(default_factory=dict)
     language: Literal["en", "zh"] = "en"

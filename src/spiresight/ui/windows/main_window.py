@@ -232,7 +232,7 @@ class MainWindow(QMainWindow):
 
     def _on_picker_changed(self, provider: str, model_id: str) -> None:
         if provider:
-            self._config.active_provider = provider
+            self._config.active_provider = provider  # type: ignore[assignment]
         if model_id:
             self._config.active_model = model_id
             self._usage_bar.set_model_label(model_id)
