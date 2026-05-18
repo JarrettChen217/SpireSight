@@ -30,3 +30,4 @@ class AppConfig(BaseSettings):
     hotkey: str = "<ctrl>+<shift>+s"
     last_used_prompt_id: str | None = None
     include_screenshot_default: bool = True
+    request_timeout_seconds: int = 180
