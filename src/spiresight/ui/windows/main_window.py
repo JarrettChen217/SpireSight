@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from PIL import Image
 import io
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QPoint, QSize, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QStatusBar,
@@ -22,7 +22,11 @@ from spiresight.capture.screen import ScreenCapture
 from spiresight.config.schema import AppConfig
 from spiresight.config.store import ConfigStore
 from spiresight.core.inspect_session import InspectSession
-from spiresight.core.request import InferenceRequest
+from spiresight.core.conversation import ConversationStore
+from spiresight.core.messages import Message
+from spiresight.core.request import QuickActionRequest, FollowUpRequest
+from spiresight.ui.widgets.info_bubble import InfoBubble
+from spiresight.ui.widgets.pin_button import PinButton
 from spiresight.core.run_state import RunState
 from spiresight.core.runner import InferenceRunner
 from spiresight.llm import registry
@@ -62,7 +66,7 @@ class MainWindow(QMainWindow):
 
     fire_action_signal = Signal()
 
-    def __init__(self, config: AppConfig, store: ConfigStore, loader: PromptLoader, *, pricing: PricingTable) -> None:
+    def __init__(self, config: AppConfig, store: ConfigStore, loader: PromptLoader, *, pricing: PricingTable, conversation_store: ConversationStore) -> None:
         super().__init__()
         self.setWindowTitle("SpireSight")
         self.resize(1080, 640)
@@ -72,6 +76,8 @@ class MainWindow(QMainWindow):
         self._capture = ScreenCapture()
         self._worker: InferenceWorker | None = None
         self._mini_bar: MiniBar | None = None
+        self._bubble: InfoBubble | None = None
+        self._conversation = conversation_store
 
         # stores
         self._run_state_store = RunStateStore(self)
@@ -85,7 +91,8 @@ class MainWindow(QMainWindow):
 
         # streaming-state bookkeeping for HistoryEntry assembly
         self._last_screenshot_png: bytes | None = None
-        self._last_request: InferenceRequest | None = None
+        self._last_request_qa: QuickActionRequest | None = None
+        self._last_follow_up_text: str = ""
         self._stream_buffer: list[str] = []
 
         self.fire_action_signal.connect(self.fire_last_action)
@@ -116,15 +123,10 @@ class MainWindow(QMainWindow):
         sidebar.setFixedWidth(280)
 
         # ── right pane: corner buttons + tabs + compose ──
-        self._pin_btn = QPushButton()
-        self._pin_btn.setCheckable(True)
-        self._pin_btn.setObjectName("corner-pin")
-        self._pin_btn.setChecked(config.always_on_top)
-        self._pin_btn.setIconSize(QSize(18, 18))
+        self._pin_btn = PinButton(pinned=config.always_on_top)
         self._pin_btn.setToolTip("Always on top")
         self._pin_btn.setFixedSize(28, 28)
-        self._pin_btn.clicked.connect(self._toggle_pin)
-        self._update_pin_icon()
+        self._pin_btn.toggled.connect(self._on_pin_toggled)
 
         self._mini_mode_btn = QPushButton()
         self._mini_mode_btn.setObjectName("corner-pin")
@@ -211,16 +213,10 @@ class MainWindow(QMainWindow):
 
     # ─── lifecycle helpers ───────────────────────────────────────
 
-    def _toggle_pin(self) -> None:
-        pinned = self._pin_btn.isChecked()
+    def _on_pin_toggled(self, pinned: bool) -> None:
         self._config.always_on_top = pinned
         self._store.save(self._config)
         self._apply_always_on_top()
-        self._update_pin_icon()
-
-    def _update_pin_icon(self) -> None:
-        icon_name = "pin_filled" if self._config.always_on_top else "pin_outline"
-        self._pin_btn.setIcon(QIcon(icon_path(icon_name)))
 
     def _apply_always_on_top(self) -> None:
         handle = self.windowHandle()
@@ -263,10 +259,25 @@ class MainWindow(QMainWindow):
                                       pinned=self._config.always_on_top)
             self._mini_bar.action_clicked.connect(self._on_action)
             self._mini_bar.expand_requested.connect(self._exit_mini_bar)
+            self._mini_bar.pin_toggled.connect(self._on_pin_toggled)
+            self._mini_bar.moved.connect(self._on_mini_bar_moved)
+            self._bubble = InfoBubble()
+            self._bubble.closed.connect(self._on_bubble_closed)
+            self._bubble.cancel_requested.connect(self._on_cancel)
+            self._bubble.follow_up_requested.connect(self._dispatch_follow_up)
         elif self._mini_bar.is_pinned != self._config.always_on_top:
             self._mini_bar.set_pinned(self._config.always_on_top)
         self.hide()
         self._mini_bar.show()
+
+        if self._bubble is not None:
+            turns = self._conversation.turns()
+            if turns:
+                self._bubble.show()
+                mb_geo = self._mini_bar.geometry()
+                anchor = QPoint(mb_geo.x() + mb_geo.width() // 2, mb_geo.y() + mb_geo.height())
+                self._bubble.move_anchored(anchor)
+
         self._config.mini_bar_mode = True
         self._store.save(self._config)
 
@@ -275,12 +286,14 @@ class MainWindow(QMainWindow):
             self._config.always_on_top = self._mini_bar.is_pinned
             self._store.save(self._config)
             self._apply_always_on_top()
-            self._update_pin_icon()
             self._pin_btn.setChecked(self._config.always_on_top)
             self._mini_bar.hide()
+        if self._bubble is not None:
+            self._bubble.hide()
         self.show()
         self._config.mini_bar_mode = False
         self._store.save(self._config)
+        self._render_conversation()
 
     def _retranslate(self) -> None:
         loc = self._ui_locale
@@ -292,6 +305,39 @@ class MainWindow(QMainWindow):
         self._tabs.set_label(_TAB_HELP,    loc.get("tab.help"))
         self._refresh_inspect_availability()
 
+    # ─── mini-bar / bubble helpers ───────────────────────────────
+
+    def _on_mini_bar_moved(self, pos: QPoint) -> None:
+        if self._bubble is not None and self._bubble.isVisible() and self._mini_bar is not None:
+            mb_geo = self._mini_bar.geometry()
+            anchor = QPoint(mb_geo.x() + mb_geo.width() // 2, mb_geo.y() + mb_geo.height())
+            self._bubble.move_anchored(anchor)
+
+    def _on_bubble_closed(self) -> None:
+        pass
+
+    def _compose_input_preview_qa(self, prompt_id: str, custom_text: str) -> str:
+        if custom_text:
+            return custom_text
+        try:
+            qa = self._loader.get_quick_action(prompt_id)
+            return qa.label
+        except Exception:
+            return prompt_id
+
+    def _render_conversation(self) -> None:
+        turns = self._conversation.turns()
+        if not turns:
+            return
+        self._tabs.setCurrentIndex(_TAB_CHAT)
+        self._chat_tab.reset()
+        for msg in turns:
+            if msg.role == "user":
+                self._chat_tab.append_user_message(msg.text)
+            else:
+                self._chat_tab.append_delta(msg.text)
+        self._chat_tab.finalize()
+
     # ─── inference flow ──────────────────────────────────────────
 
     def fire_last_action(self) -> None:
@@ -299,15 +345,18 @@ class MainWindow(QMainWindow):
             self._on_action(self._config.last_used_prompt_id)
 
     def _on_compose_send(self, text: str, include_screenshot: bool) -> None:
-        actions = self._loader.quick_actions()
-        if not actions:
-            return
-        action_id = self._config.last_used_prompt_id or actions[0].id
-        self._on_action(
-            action_id,
-            custom_text_override=text,
-            include_screenshot_override=include_screenshot,
-        )
+        if self._conversation.turns():
+            self._dispatch_follow_up(text, recapture=include_screenshot)
+        else:
+            actions = self._loader.quick_actions()
+            if not actions:
+                return
+            action_id = self._config.last_used_prompt_id or actions[0].id
+            self._on_action(
+                action_id,
+                custom_text_override=text,
+                include_screenshot_override=include_screenshot,
+            )
 
     def _on_action(
         self,
@@ -330,7 +379,9 @@ class MainWindow(QMainWindow):
             else self._compose.include_screenshot()
         )
 
-        request = InferenceRequest(
+        self._conversation.clear()
+
+        request = QuickActionRequest(
             prompt_id=action_id,
             custom_text=custom_text,
             include_screenshot=include_screenshot,
@@ -353,7 +404,7 @@ class MainWindow(QMainWindow):
             ))
 
         self._last_screenshot_png = screenshot_png
-        self._last_request = request
+        self._last_request_qa = request
         self._stream_buffer = []
 
         runner = InferenceRunner(
@@ -364,13 +415,31 @@ class MainWindow(QMainWindow):
             run_state_store=self._run_state_store,
         )
 
-        self._tabs.setCurrentIndex(_TAB_CHAT)
-        self._chat_tab.reset()
+        is_mini = self._config.mini_bar_mode
+
+        if is_mini and self._bubble is not None:
+            try:
+                qa = self._loader.get_quick_action(action_id)
+                action_label = qa.label
+            except Exception:
+                action_label = action_id
+            self._bubble.reset()
+            self._bubble.set_title(action_label, self._config.active_model)
+            self._bubble.set_streaming(True)
+            self._bubble.show()
+            if self._mini_bar is not None:
+                mb_geo = self._mini_bar.geometry()
+                anchor = QPoint(mb_geo.x() + mb_geo.width() // 2, mb_geo.y() + mb_geo.height())
+                self._bubble.move_anchored(anchor)
+        else:
+            self._tabs.setCurrentIndex(_TAB_CHAT)
+            self._chat_tab.reset()
+
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
 
-        input_preview = self._compose_input_preview(request)
-        self._worker = InferenceWorker(
+        input_preview = self._compose_input_preview_qa(action_id, custom_text)
+        self._worker = InferenceWorker.for_quick_action(
             runner, request,
             model_id=self._config.active_model,
             input_preview=input_preview,
@@ -386,23 +455,10 @@ class MainWindow(QMainWindow):
 
     def _on_chunk(self, text: str) -> None:
         self._stream_buffer.append(text)
-        self._chat_tab.append_delta(text)
-
-    def _compose_input_preview(self, request: InferenceRequest) -> str:
-        """Build the 'input preview' text that the UsageBar / LogsTab show.
-
-        Prefer the user's typed custom_text, since that's what they
-        actually want to see attributed to a call. Fall back to the
-        quick-action label so quick-fire prompts still get a meaningful
-        line in Logs.
-        """
-        if request.custom_text:
-            return request.custom_text
-        try:
-            qa = self._loader.get_quick_action(request.prompt_id)
-            return qa.label
-        except Exception:  # noqa: BLE001  — preview is best-effort
-            return request.prompt_id
+        if self._config.mini_bar_mode and self._bubble is not None:
+            self._bubble.append_delta(text)
+        else:
+            self._chat_tab.append_delta(text)
 
     def _on_usage_recorded(self, record: CallRecord) -> None:
         """Worker emits CallRecord with cost_usd=None; attach a price here, then forward."""
@@ -421,6 +477,8 @@ class MainWindow(QMainWindow):
             output_preview=record.output_preview,
         )
         self._tracker.call_completed_ok(priced_record)
+        if self._bubble is not None:
+            self._bubble.set_cost(priced_cost, priced_record.usage)
 
     def _on_resend(self, entry: HistoryEntry) -> None:
         screenshot_png = entry.screenshot_png
@@ -431,7 +489,7 @@ class MainWindow(QMainWindow):
                 self._log(f"resend capture failed: {exc}")
                 screenshot_png = None
 
-        request = InferenceRequest(
+        request = QuickActionRequest(
             prompt_id=entry.prompt_id,
             custom_text=entry.custom_text,
             include_screenshot=entry.include_screenshot and screenshot_png is not None,
@@ -446,7 +504,7 @@ class MainWindow(QMainWindow):
             ))
 
         self._last_screenshot_png = screenshot_png
-        self._last_request = request
+        self._last_request_qa = request
         self._stream_buffer = []
 
         runner = InferenceRunner(
@@ -461,8 +519,8 @@ class MainWindow(QMainWindow):
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
 
-        input_preview = self._compose_input_preview(request)
-        self._worker = InferenceWorker(
+        input_preview = self._compose_input_preview_qa(entry.prompt_id, entry.custom_text or "")
+        self._worker = InferenceWorker.for_quick_action(
             runner, request,
             model_id=self._config.active_model,
             input_preview=input_preview,
@@ -485,19 +543,34 @@ class MainWindow(QMainWindow):
         self._compose.set_streaming(False)
         self.statusBar().showMessage("Done.", 3000)
 
-        if self._last_request is not None:
+        if self._bubble is not None:
+            self._bubble.finalize()
+
+        full_markdown = "".join(self._stream_buffer)
+
+        user_text = ""
+        if self._last_request_qa is not None:
+            user_text = self._last_request_qa.custom_text or self._last_request_qa.prompt_id
+        self._conversation.append(Message(
+            role="user",
+            text=user_text,
+            image_png=self._last_screenshot_png,
+        ))
+        self._conversation.append(Message(role="assistant", text=full_markdown))
+
+        if self._last_request_qa is not None:
             entry = HistoryEntry(
                 timestamp=datetime.now(tz=timezone.utc),
-                prompt_id=self._last_request.prompt_id,
-                custom_text=self._last_request.custom_text,
+                prompt_id=self._last_request_qa.prompt_id,
+                custom_text=self._last_request_qa.custom_text,
                 model_id=self._config.active_model,
-                include_screenshot=self._last_request.include_screenshot,
+                include_screenshot=self._last_request_qa.include_screenshot,
                 screenshot_png=self._last_screenshot_png,
-                markdown="".join(self._stream_buffer),
+                markdown=full_markdown,
             )
             self._history_store.append(entry)
 
-        self._last_request = None
+        self._last_request_qa = None
         self._last_screenshot_png = None
         self._stream_buffer = []
 
@@ -525,9 +598,91 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage(f"Error: {exc}", 8000)
 
-        self._last_request = None
+        self._last_request_qa = None
         self._last_screenshot_png = None
         self._stream_buffer = []
+
+    def _dispatch_follow_up(self, text: str, recapture: bool) -> None:
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.cancel()
+            self._worker.wait()
+
+        self._last_follow_up_text = text
+
+        include_screenshot = recapture or self._conversation.last_screenshot() is not None
+
+        request = FollowUpRequest(
+            user_text=text,
+            include_screenshot=include_screenshot,
+            recapture=recapture,
+        )
+        history = self._conversation.turns()
+
+        screenshot_png: bytes | None = None
+        if recapture:
+            try:
+                screenshot_png = self._capture.grab_primary()
+                self._last_screenshot_png = screenshot_png
+            except Exception as exc:  # noqa: BLE001
+                self._log(f"follow-up capture failed: {exc}")
+
+        runner = InferenceRunner(
+            config=self._config,
+            prompt_loader=self._loader,
+            provider_factory=registry.get,
+            screen_capture=self._capture,
+            run_state_store=None,
+        )
+
+        self._stream_buffer = []
+
+        is_mini = self._config.mini_bar_mode
+
+        if is_mini and self._bubble is not None:
+            self._bubble.set_streaming(True)
+        else:
+            self._tabs.setCurrentIndex(_TAB_CHAT)
+            self._chat_tab.reset()
+
+        self._compose.set_streaming(True)
+        self.statusBar().showMessage("Streaming…")
+
+        from spiresight.core.usage import _truncate_preview
+        input_preview = _truncate_preview(text, 60)
+        self._worker = InferenceWorker.for_follow_up(
+            runner, request, history,
+            model_id=self._config.active_model,
+            input_preview=input_preview,
+            parent=self,
+        )
+        self._worker.chunk.connect(self._on_chunk)
+        self._worker.finished_ok.connect(self._on_follow_up_finished)
+        self._worker.failed.connect(self._on_failed)
+        self._worker.run_started.connect(self._tracker.call_started)
+        self._worker.usage_recorded.connect(self._on_usage_recorded)
+        self._worker.cancelled.connect(self._tracker.call_cancelled)
+        self._worker.start()
+
+    def _on_follow_up_finished(self) -> None:
+        self._chat_tab.finalize()
+        self._compose.set_streaming(False)
+        self.statusBar().showMessage("Done.", 3000)
+
+        if self._bubble is not None:
+            self._bubble.finalize()
+
+        full_markdown = "".join(self._stream_buffer)
+
+        self._conversation.append(Message(
+            role="user",
+            text=self._last_follow_up_text,
+            image_png=self._last_screenshot_png,
+        ))
+        self._conversation.append(Message(role="assistant", text=full_markdown))
+
+        self._last_screenshot_png = None
+        self._stream_buffer = []
+        self._last_follow_up_text = ""
 
     def _log(self, message: str) -> None:
         self._logs_tab.log(message)
