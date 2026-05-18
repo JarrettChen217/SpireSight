@@ -373,3 +373,69 @@ QFrame[role="divider"] {
 QFormLayout QLabel {
     color: #8a8272;
 }
+
+/* ── InfoBubble ─────────────────────────────────────────────── */
+QWidget#info-bubble {
+    background-color: #0d1018;
+    border: 1px solid #1d2233;
+    border-radius: 8px;
+}
+QWidget#bubble-title-bar {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                      stop:0 rgba(212,165,74,10), stop:1 transparent);
+    border-bottom: 1px solid #1d2233;
+}
+QLabel#bubble-chip { color: #d4a54a; font-weight: 600; font-size: 10px; }
+QLabel#bubble-model { color: #6e7a89; font-family: monospace; font-size: 10px; }
+QPushButton#bubble-close { color: #6e7a89; border: none; font-size: 14px; }
+QPushButton#bubble-close:hover { color: #d4743a; }
+QLabel#bubble-user-msg {
+    background-color: #10141e;
+    border-left: 2px solid #d4a54a;
+    border-radius: 0 4px 4px 0;
+    padding: 6px 10px;
+    color: #6e7a89;
+}
+QToolButton#bubble-camera {
+    color: #6e7a89;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+QToolButton#bubble-camera:checked {
+    background-color: rgba(212,165,74,18);
+    border-color: #d4a54a;
+    color: #d4a54a;
+}
+QPushButton#bubble-send {
+    background-color: #d4a54a;
+    color: #1a1408;
+    font-weight: 600;
+    border-radius: 5px;
+    padding: 6px 12px;
+}
+QLineEdit#bubble-input {
+    background-color: #10141e;
+    border: 1px solid #1d2233;
+    border-radius: 5px;
+    padding: 6px 9px;
+    color: #d5cebf;
+}
+QLineEdit#bubble-input:focus { border-color: #3a6080; }
+QPushButton#bubble-cancel {
+    border: 1px solid #1d2233;
+    color: #d4743a;
+    background: transparent;
+    padding: 2px 10px;
+    border-radius: 4px;
+}
+QPushButton#bubble-cancel:hover { border-color: #d4743a; }
+
+/* ── PinButton ──────────────────────────────────────────────── */
+QToolButton#pin-button {
+    color: #6e7a89;
+    border: none;
+    padding: 4px;
+}
+QToolButton#pin-button:checked {
+    color: #d4a54a;
+}
