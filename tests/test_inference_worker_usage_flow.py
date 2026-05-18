@@ -167,3 +167,33 @@ def test_worker_emits_failed_on_exception(qtwidgets_app):
 
     assert len(excs) == 1
     assert isinstance(excs[0], RuntimeError)
+
+
+def test_for_follow_up_emits_usage_recorded(qtwidgets_app):
+    from spiresight.core.request import FollowUpRequest
+    from spiresight.core.messages import Message
+
+    class _FollowUpRunner:
+        def run_follow_up(self, request, history, *, cancel_event):
+            yield StreamChunk(text_delta="follow-up response", finish_reason="stop")
+            yield StreamChunk(text_delta="", usage=TokenUsage(10, 20))
+
+    runner = _FollowUpRunner()
+    req = FollowUpRequest(user_text="tell me more")
+    history = (Message(role="user", text="hello"), Message(role="assistant", text="hi"))
+    worker = InferenceWorker.for_follow_up(
+        runner, req, history,
+        model_id="gpt-4o",
+        input_preview="tell me more",
+    )
+    started: list[tuple[str, str]] = []
+    records: list[CallRecord] = []
+    worker.run_started.connect(lambda m, q: started.append((m, q)))
+    worker.usage_recorded.connect(records.append)
+
+    _drain(worker)
+
+    assert started == [("gpt-4o", "tell me more")]
+    assert len(records) == 1
+    assert records[0].usage == TokenUsage(10, 20)
+    assert records[0].output_preview == "follow-up response"

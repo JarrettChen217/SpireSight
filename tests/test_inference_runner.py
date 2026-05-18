@@ -340,3 +340,119 @@ def test_inspect_with_no_frames_raises_value_error():
     with pytest.raises(ValueError, match="at least one frame"):
         runner.inspect(images=[], cancel_event=threading.Event())
     assert provider.last_call is None  # provider was never called
+
+
+# ---------------------------------------------------------------------------
+# run_follow_up tests
+# ---------------------------------------------------------------------------
+
+def test_run_follow_up_uses_guard_prompt_and_messages():
+    from spiresight.core.messages import Message
+    from spiresight.core.request import FollowUpRequest
+
+    qa = QuickAction(id="x", label="X", system_prompt_id="s",
+                     user_template="t", requires_screenshot=False,
+                     required_capabilities=[])
+    sp = SystemPrompt(id="s", description="", content="base prompt")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o", frozenset(), 128_000)],
+        chunks=[StreamChunk("follow-up reply", "stop")],
+    )
+    runner = _runner(provider=provider, loader=_FakeLoader(qa, sp))
+
+    history = (
+        Message(role="user", text="what should I pick?"),
+        Message(role="assistant", text="pick Bash"),
+    )
+    req = FollowUpRequest(user_text="why Bash?", recapture=False)
+    out = list(runner.run_follow_up(req, history, cancel_event=threading.Event()))
+
+    assert "".join(c.text_delta for c in out) == "follow-up reply"
+    assert provider.last_call is not None
+    # Guard prompt must not contain the base prompt
+    assert "base prompt" not in provider.last_call["system"]
+    assert "conversation" in provider.last_call["system"].lower()
+    # Must pass messages, not user_text
+    assert provider.last_call["messages"] is not None
+    assert provider.last_call.get("user_text", "") == ""
+    # Messages should have 3 entries: 2 from history + 1 new user msg
+    assert len(provider.last_call["messages"]) == 3
+    assert provider.last_call["messages"][2].role == "user"
+    assert provider.last_call["messages"][2].text == "why Bash?"
+
+
+def test_run_follow_up_recapture_grabs_new_screenshot():
+    from spiresight.core.messages import Message
+    from spiresight.core.request import FollowUpRequest
+
+    qa = QuickAction(id="x", label="X", system_prompt_id="s",
+                     user_template="t", requires_screenshot=False,
+                     required_capabilities=[])
+    sp = SystemPrompt(id="s", description="", content="s")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o", frozenset(), 128_000)],
+        chunks=[StreamChunk("ok", "stop")],
+    )
+    capture = _FakeCapture()
+    cfg = AppConfig(active_provider="openai", active_model="gpt-4o")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    runner = InferenceRunner(
+        config=cfg, prompt_loader=_FakeLoader(qa, sp),
+        provider_factory=lambda n, p: provider, screen_capture=capture,
+    )
+
+    history = (Message(role="user", text="hi"),)
+    req = FollowUpRequest(user_text="again", recapture=True)
+    list(runner.run_follow_up(req, history, cancel_event=threading.Event()))
+
+    messages = provider.last_call["messages"]
+    assert messages[-1].image_png == b"PNG_BYTES"
+
+
+def test_run_follow_up_reuses_screenshot_from_history():
+    from spiresight.core.messages import Message
+    from spiresight.core.request import FollowUpRequest
+
+    qa = QuickAction(id="x", label="X", system_prompt_id="s",
+                     user_template="t", requires_screenshot=False,
+                     required_capabilities=[])
+    sp = SystemPrompt(id="s", description="", content="s")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o", frozenset(), 128_000)],
+        chunks=[StreamChunk("ok", "stop")],
+    )
+    runner = _runner(provider=provider, loader=_FakeLoader(qa, sp))
+
+    old_png = b"OLD_SCREENSHOT"
+    history = (
+        Message(role="user", text="first question", image_png=old_png),
+        Message(role="assistant", text="first answer"),
+    )
+    req = FollowUpRequest(user_text="follow up", include_screenshot=True, recapture=False)
+    list(runner.run_follow_up(req, history, cancel_event=threading.Event()))
+
+    messages = provider.last_call["messages"]
+    assert messages[-1].image_png == old_png
+
+
+def test_run_follow_up_skips_capability_check():
+    from spiresight.core.request import FollowUpRequest
+
+    qa = QuickAction(id="x", label="X", system_prompt_id="s",
+                     user_template="t", requires_screenshot=False,
+                     required_capabilities=[])
+    sp = SystemPrompt(id="s", description="", content="s")
+    # Use a non-vision model — follow-up should NOT fail on capability check
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-3.5", "gpt-3.5", frozenset(), 16_000)],
+        chunks=[StreamChunk("ok", "stop")],
+    )
+    cfg = AppConfig(active_provider="openai", active_model="gpt-3.5")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    runner = InferenceRunner(
+        config=cfg, prompt_loader=_FakeLoader(qa, sp),
+        provider_factory=lambda n, p: provider, screen_capture=_FakeCapture(),
+    )
+    req = FollowUpRequest(user_text="hello")
+    # Should NOT raise MissingCapabilityError
+    list(runner.run_follow_up(req, (), cancel_event=threading.Event()))
