@@ -38,6 +38,7 @@ from spiresight.ui.state.screenshot_store import ScreenshotBundle, ScreenshotSto
 from spiresight.ui.tabs.chat_tab import ChatTab
 from spiresight.ui.tabs.help_tab import HelpTab
 from spiresight.ui.tabs.history_tab import HistoryTab
+from spiresight.core.usage import CallRecord, PricingTable, UsageTracker
 from spiresight.ui.tabs.logs_tab import LogsTab
 from spiresight.ui.tabs.run_state_tab import RunStateTab
 from spiresight.ui.tabs.screenshot_tab import ScreenshotTab
@@ -46,6 +47,7 @@ from spiresight.ui.theme import icon_path
 from spiresight.ui.widgets.compose_dock import ComposeDock
 from spiresight.ui.widgets.inspect_panel import InspectPanel
 from spiresight.ui.widgets.mini_bar import MiniBar
+from spiresight.ui.widgets.usage_bar import UsageBar
 from spiresight.ui.widgets.prompt_panel import PromptPanel
 from spiresight.ui.widgets.provider_picker import ProviderPicker
 from spiresight.ui.windows.settings_dialog import SettingsDialog
@@ -60,7 +62,7 @@ class MainWindow(QMainWindow):
 
     fire_action_signal = Signal()
 
-    def __init__(self, config: AppConfig, store: ConfigStore, loader: PromptLoader) -> None:
+    def __init__(self, config: AppConfig, store: ConfigStore, loader: PromptLoader, *, pricing: PricingTable) -> None:
         super().__init__()
         self.setWindowTitle("SpireSight")
         self.resize(1080, 640)
@@ -196,6 +198,14 @@ class MainWindow(QMainWindow):
         menu.addAction("Quit", self.close)
 
         self.setStatusBar(QStatusBar())
+
+        # --- usage tracking ---
+        self._pricing = pricing
+        self._tracker = UsageTracker(self)
+        self._usage_bar = UsageBar(self._tracker, model_label=self._config.active_model)
+        self.statusBar().addPermanentWidget(self._usage_bar)
+        self._tracker.call_recorded.connect(self._logs_tab.log_cost)
+
         self._refresh_inspect_availability()
         self._ui_locale.changed.connect(self._retranslate)
 
@@ -229,6 +239,7 @@ class MainWindow(QMainWindow):
             self._config.active_provider = provider
         if model_id:
             self._config.active_model = model_id
+            self._usage_bar.set_model_label(model_id)
         self._store.save(self._config)
         self._refresh_inspect_availability()
 
@@ -358,15 +369,58 @@ class MainWindow(QMainWindow):
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
 
-        self._worker = InferenceWorker(runner, request, self)
+        input_preview = self._compose_input_preview(request)
+        self._worker = InferenceWorker(
+            runner, request,
+            model_id=self._config.active_model,
+            input_preview=input_preview,
+            parent=self,
+        )
         self._worker.chunk.connect(self._on_chunk)
         self._worker.finished_ok.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
+        self._worker.run_started.connect(self._tracker.call_started)
+        self._worker.usage_recorded.connect(self._on_usage_recorded)
+        self._worker.cancelled.connect(self._tracker.call_cancelled)
         self._worker.start()
 
     def _on_chunk(self, text: str) -> None:
         self._stream_buffer.append(text)
         self._chat_tab.append_delta(text)
+
+    def _compose_input_preview(self, request: InferenceRequest) -> str:
+        """Build the 'input preview' text that the UsageBar / LogsTab show.
+
+        Prefer the user's typed custom_text, since that's what they
+        actually want to see attributed to a call. Fall back to the
+        quick-action label so quick-fire prompts still get a meaningful
+        line in Logs.
+        """
+        if request.custom_text:
+            return request.custom_text
+        try:
+            qa = self._loader.get_quick_action(request.prompt_id)
+            return qa.label
+        except Exception:  # noqa: BLE001  — preview is best-effort
+            return request.prompt_id
+
+    def _on_usage_recorded(self, record: CallRecord) -> None:
+        """Worker emits CallRecord with cost_usd=None; attach a price here, then forward."""
+        priced_cost = (
+            self._pricing.compute(record.model, record.usage)
+            if record.usage_known
+            else None
+        )
+        priced_record = CallRecord(
+            timestamp=record.timestamp,
+            model=record.model,
+            usage=record.usage,
+            usage_known=record.usage_known,
+            cost_usd=priced_cost,
+            input_preview=record.input_preview,
+            output_preview=record.output_preview,
+        )
+        self._tracker.call_completed_ok(priced_record)
 
     def _on_resend(self, entry: HistoryEntry) -> None:
         screenshot_png = entry.screenshot_png
@@ -406,10 +460,20 @@ class MainWindow(QMainWindow):
         self._chat_tab.reset()
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
-        self._worker = InferenceWorker(runner, request, self)
+
+        input_preview = self._compose_input_preview(request)
+        self._worker = InferenceWorker(
+            runner, request,
+            model_id=self._config.active_model,
+            input_preview=input_preview,
+            parent=self,
+        )
         self._worker.chunk.connect(self._on_chunk)
         self._worker.finished_ok.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
+        self._worker.run_started.connect(self._tracker.call_started)
+        self._worker.usage_recorded.connect(self._on_usage_recorded)
+        self._worker.cancelled.connect(self._tracker.call_cancelled)
         self._worker.start()
 
     def _on_cancel(self) -> None:
@@ -438,6 +502,7 @@ class MainWindow(QMainWindow):
         self._stream_buffer = []
 
     def _on_failed(self, exc: Exception) -> None:
+        self._tracker.call_failed(str(exc))
         self._chat_tab.finalize()
         self._compose.set_streaming(False)
         msg = str(exc) or exc.__class__.__name__

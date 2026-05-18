@@ -30,6 +30,17 @@ def _prompts_root() -> Path:
     raise FileNotFoundError("Could not locate prompts/ directory")
 
 
+def _prices_path() -> Path:
+    """Locate config/prices.yaml whether running from source or bundle."""
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "config" / "prices.yaml"
+        if candidate.exists():
+            return candidate
+    # Fall through — caller's PricingTable.load handles missing file.
+    return Path(__file__).resolve().parent / "config" / "prices.yaml"
+
+
 def run() -> int:
     configure_logging()
     paths.ensure_dirs()
@@ -40,10 +51,13 @@ def run() -> int:
     loader = PromptLoader(_prompts_root())
     loader.reload(language=config.language)
 
+    from spiresight.core.usage import PricingTable
+    pricing = PricingTable.load(_prices_path())
+
     qt_app = QApplication(sys.argv)
     qt_app.setStyleSheet(load_qss(config.theme))
 
-    window = MainWindow(config, store, loader)
+    window = MainWindow(config, store, loader, pricing=pricing)
     window.show()
 
     hotkey_mgr: HotkeyManager | None = None
