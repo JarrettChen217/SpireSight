@@ -3,12 +3,13 @@ from __future__ import annotations
 from spiresight.config.schema import ProviderConfig
 from spiresight.llm.provider import LLMProvider, ProviderOptions
 from spiresight.llm.providers.openai_provider import OpenAIProvider
+from spiresight.llm.providers.openai_compat_provider import OpenAICompatProvider
 from spiresight.llm.providers.anthropic_provider import AnthropicProvider
 from spiresight.llm.providers.gemini_provider import GeminiProvider
 
 
 def names() -> list[str]:
-    return ["openai", "anthropic", "gemini"]
+    return ["openai", "openai_compat", "anthropic", "gemini"]
 
 
 def make_provider(
@@ -19,6 +20,8 @@ def make_provider(
     options = options or ProviderOptions()
     if name == "openai":
         return OpenAIProvider(config, options)
+    if name == "openai_compat":
+        return OpenAICompatProvider(config, options)
     if name == "anthropic":
         return AnthropicProvider(config, options)
     if name == "gemini":

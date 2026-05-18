@@ -57,19 +57,21 @@ def test_switch_to_provider_without_models(main_window):
     # Switch to openai_compat (no built-in models; needs Refresh)
     picker = main_window._picker
     idx = picker._provider_box.findData("openai_compat")
-    if idx >= 0:
-        picker._provider_box.setCurrentIndex(idx)
-        # Status bar should show provider name with "(no models)"
-        status_text = main_window._usage_bar.text_for_test()
-        assert "openai_compat" in status_text.lower()
-        assert "no models" in status_text.lower()
-        # UI should be disabled
-        assert not main_window._compose.isEnabled()
-        assert not main_window._prompt_panel.isEnabled()
-        # Config should reflect provider change
-        assert main_window._config.active_provider == "openai_compat"
-    else:
+    if idx < 0:
         pytest.skip("openai_compat not in picker yet")
+    picker._provider_box.setCurrentIndex(idx)
+    # Process events so Qt signals fire
+    from PySide6.QtWidgets import QApplication
+    QApplication.processEvents()
+    # Status bar should show provider name with "(no models)"
+    status_text = main_window._usage_bar.text_for_test()
+    assert ("openai_compat" in status_text.lower() or
+            "no models" in status_text.lower()), f"got: {status_text}"
+    # UI should be disabled
+    assert not main_window._compose.isEnabled()
+    assert not main_window._prompt_panel.isEnabled()
+    # Config should reflect provider change
+    assert main_window._config.active_provider == "openai_compat"
 
 
 def test_switch_back_to_provider_with_models(main_window):

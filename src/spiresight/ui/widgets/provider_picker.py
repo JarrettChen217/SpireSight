@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidg
 
 from spiresight.llm import registry
 from spiresight.llm.capabilities import Capability
+from spiresight.llm.errors import MissingBaseURL
 from spiresight.config.schema import ProviderConfig
 
 
@@ -58,8 +59,12 @@ class ProviderPicker(QWidget):
     def _reload_models(self) -> None:
         self._model_box.clear()
         name = self._provider_box.currentData()
-        provider = registry.get(name, ProviderConfig())
-        for m in provider.list_models():
+        try:
+            provider = registry.get(name, ProviderConfig())
+            models = provider.list_models()
+        except MissingBaseURL:
+            models = []
+        for m in models:
             label = m.display_name
             if Capability.VISION in m.capabilities:
                 label += "  (vision)"
@@ -73,8 +78,13 @@ class ProviderPicker(QWidget):
         if not name or not model_id:
             self._badge.setVisible(False)
             return
-        provider = registry.get(name, ProviderConfig())
-        for m in provider.list_models():
+        try:
+            provider = registry.get(name, ProviderConfig())
+            models = provider.list_models()
+        except MissingBaseURL:
+            self._badge.setVisible(False)
+            return
+        for m in models:
             if m.id == model_id:
                 vision = Capability.VISION in m.capabilities
                 self._badge.setText("vision" if vision else "no vision")
