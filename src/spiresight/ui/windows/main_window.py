@@ -410,7 +410,7 @@ class MainWindow(QMainWindow):
         runner = InferenceRunner(
             config=self._config,
             prompt_loader=self._loader,
-            provider_factory=registry.get,
+            provider_factory=registry.make_provider,
             screen_capture=_PrecapturedScreen(screenshot_png) if screenshot_png else self._capture,
             run_state_store=self._run_state_store,
         )
@@ -510,7 +510,7 @@ class MainWindow(QMainWindow):
         runner = InferenceRunner(
             config=self._config,
             prompt_loader=self._loader,
-            provider_factory=registry.get,
+            provider_factory=registry.make_provider,
             screen_capture=_PrecapturedScreen(screenshot_png) if screenshot_png else self._capture,
             run_state_store=self._run_state_store,
         )
@@ -629,7 +629,7 @@ class MainWindow(QMainWindow):
         runner = InferenceRunner(
             config=self._config,
             prompt_loader=self._loader,
-            provider_factory=registry.get,
+            provider_factory=registry.make_provider,
             screen_capture=self._capture,
             run_state_store=None,
         )
@@ -717,7 +717,7 @@ class MainWindow(QMainWindow):
         runner = InferenceRunner(
             config=self._config,
             prompt_loader=self._loader,
-            provider_factory=registry.get,
+            provider_factory=registry.make_provider,
             screen_capture=self._capture,
             run_state_store=self._run_state_store,
         )

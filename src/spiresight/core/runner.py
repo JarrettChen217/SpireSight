@@ -18,7 +18,7 @@ from spiresight.core.run_state import RunState
 from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import MissingAPIKey, MissingCapabilityError
 from spiresight.llm.models import ModelInfo
-from spiresight.llm.provider import LLMProvider, StreamChunk
+from spiresight.llm.provider import LLMProvider, ProviderOptions, StreamChunk
 from spiresight.prompts.loader import PromptLoader
 
 INSPECTOR_PROMPT_ID = "sts_inspector"
@@ -42,7 +42,7 @@ def _load_guard_prompt() -> str:
         "If you lack needed information, say so explicitly."
     )
 
-ProviderFactory = Callable[[str, ProviderConfig], LLMProvider]
+ProviderFactory = Callable[[str, ProviderConfig, ProviderOptions], LLMProvider]
 
 
 class CaptureSource(Protocol):
@@ -84,14 +84,7 @@ class InferenceRunner:
 
         sp = self._loader.get_system_prompt(INSPECTOR_PROMPT_ID)
 
-        provider_cfg = self._config.providers.get(
-            self._config.active_provider, ProviderConfig()
-        )
-        if not provider_cfg.api_key:
-            raise MissingAPIKey(self._config.active_provider)
-        provider = self._factory(self._config.active_provider, provider_cfg)
-
-        model = self._resolve_model(provider, self._config.active_model)
+        provider, model = self._get_provider_and_model()
         missing = _INSPECT_CAPS - set(model.capabilities)
         if missing:
             raise MissingCapabilityError(model=model.id, missing=set(missing))
@@ -124,7 +117,10 @@ class InferenceRunner:
         )
         if not provider_cfg.api_key:
             raise MissingAPIKey(self._config.active_provider)
-        provider = self._factory(self._config.active_provider, provider_cfg)
+        options = ProviderOptions(
+            request_timeout_seconds=self._config.request_timeout_seconds,
+        )
+        provider = self._factory(self._config.active_provider, provider_cfg, options)
         model = self._resolve_model(provider, self._config.active_model)
         return provider, model
 
