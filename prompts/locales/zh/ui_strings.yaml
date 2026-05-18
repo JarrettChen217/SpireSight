@@ -61,3 +61,15 @@ logs:
   empty: "暂无事件。"
   copy_all: "复制全部"
   clear: "清空"
+
+usage:
+  tooltip:
+    input: "本次会话输入 tokens"
+    output: "本次会话输出 tokens"
+    cost: "本次会话估算费用"
+    unpriced: "（部分模型无报价）"
+  light:
+    idle: "尚未发送请求"
+    running: "正在请求"
+    ok: "上次请求成功"
+    error: "上次请求失败"
