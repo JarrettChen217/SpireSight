@@ -1,27 +1,52 @@
 # src/spiresight/ui/windows/settings_dialog.py
-"""Settings dialog: API keys per provider, language, hotkey, always-on-top."""
+"""Settings dialog: per-provider config + general preferences."""
 from __future__ import annotations
 
+import logging
+
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-    QLineEdit, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
+    QLineEdit, QMessageBox, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from spiresight.config.schema import AppConfig, ProviderConfig
+from spiresight.config.store import ConfigStore
 from spiresight.llm import registry
+from spiresight.llm.errors import MissingAPIKey, MissingBaseURL
+from spiresight.llm.provider import ProviderOptions
+from spiresight.llm.providers.openai_compat_provider import RELAY_PRESETS
+from spiresight.ui.widgets.provider_pane import ProviderPane
+from spiresight.ui.workers.model_refresh_worker import ModelRefreshWorker
+
+_log = logging.getLogger(__name__)
+
+
+def _presets_for(name: str) -> dict[str, str] | None:
+    if name == "openai_compat":
+        return RELAY_PRESETS
+    return None
+
+
+def _require_base_url(name: str) -> bool:
+    return name == "openai_compat"
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, config: AppConfig, parent=None) -> None:
+    models_refreshed = Signal(str)              # provider_name
+    models_refresh_failed = Signal(str, object) # provider_name, Exception
+
+    def __init__(self, config: AppConfig, store: ConfigStore, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("SpireSight — Settings")
         self._config = config
-        self._key_inputs: dict[str, QLineEdit] = {}
+        self._store = store
+        self._panes: dict[str, ProviderPane] = {}
+        self._workers: dict[str, ModelRefreshWorker] = {}
 
         root = QVBoxLayout(self)
-
         tabs = QTabWidget()
-        tabs.addTab(self._build_keys_tab(), "API Keys")
+        tabs.addTab(self._build_providers_tab(), "Providers")
         tabs.addTab(self._build_general_tab(), "General")
         root.addWidget(tabs)
 
@@ -32,17 +57,63 @@ class SettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
 
-    def _build_keys_tab(self) -> QWidget:
-        page = QWidget()
-        form = QFormLayout(page)
+    # ---- Providers tab ----
+
+    def _build_providers_tab(self) -> QWidget:
+        nested = QTabWidget()
         for name in registry.names():
             cfg = self._config.providers.get(name, ProviderConfig())
-            edit = QLineEdit(cfg.api_key)
-            edit.setEchoMode(QLineEdit.EchoMode.Password)
-            edit.setPlaceholderText(f"{name} API key")
-            self._key_inputs[name] = edit
-            form.addRow(name.capitalize(), edit)
-        return page
+            pane = ProviderPane(
+                name, cfg,
+                require_base_url=_require_base_url(name),
+                base_url_presets=_presets_for(name),
+                on_refresh=self.refresh_provider,
+            )
+            self._panes[name] = pane
+            nested.addTab(pane, name)
+        return nested
+
+    def refresh_provider(self, name: str) -> None:
+        pane = self._panes[name]
+        pane.set_busy(True)
+        cur = self._config.providers.get(name, ProviderConfig())
+        cfg_now = ProviderConfig(
+            api_key=pane.api_key_value(),
+            base_url=pane.base_url_value() or None,
+            cached_models=cur.cached_models,
+        )
+        options = ProviderOptions(request_timeout_seconds=self._config.request_timeout_seconds)
+        try:
+            provider = registry.make_provider(name, cfg_now, options)
+        except (MissingBaseURL, MissingAPIKey) as exc:
+            QMessageBox.warning(self, "Refresh", str(exc))
+            pane.set_busy(False)
+            return
+
+        worker = ModelRefreshWorker(name, provider, parent=self)
+        worker.succeeded.connect(self._on_refresh_succeeded)
+        worker.failed.connect(self._on_refresh_failed)
+        worker.finished.connect(lambda n=name: self._panes[n].set_busy(False))
+        worker.start()
+        self._workers[name] = worker
+
+    def _on_refresh_succeeded(self, name: str, models: list) -> None:
+        cur = self._config.providers.get(name, ProviderConfig())
+        new_cfg = ProviderConfig(
+            api_key=cur.api_key,
+            base_url=cur.base_url,
+            cached_models=[m.to_dict() for m in models],
+        )
+        self._config.providers[name] = new_cfg
+        self._store.save(self._config)
+        self._panes[name].set_model_count(len(models))
+        self.models_refreshed.emit(name)
+
+    def _on_refresh_failed(self, name: str, exc: Exception) -> None:
+        QMessageBox.warning(self, "Refresh failed", f"{name}: {exc}")
+        self.models_refresh_failed.emit(name, exc)
+
+    # ---- General tab (unchanged from spec #1) ----
 
     def _build_general_tab(self) -> QWidget:
         page = QWidget()
@@ -68,16 +139,18 @@ class SettingsDialog(QDialog):
         form.addRow("Language", self._lang)
         form.addRow("Hotkey", self._hotkey)
         form.addRow("Always on top", self._on_top)
-        # Settings dialog locale awareness is a follow-up; using English literal for now.
         form.addRow("Request timeout (seconds)", self._timeout)
         return page
 
+    # ---- accept / persistence ----
+
     def _apply_and_accept(self) -> None:
-        for name, edit in self._key_inputs.items():
-            current = self._config.providers.get(name, ProviderConfig())
+        for name, pane in self._panes.items():
+            cur = self._config.providers.get(name, ProviderConfig())
             self._config.providers[name] = ProviderConfig(
-                api_key=edit.text().strip(),
-                base_url=current.base_url,
+                api_key=pane.api_key_value(),
+                base_url=pane.base_url_value() or None,
+                cached_models=cur.cached_models,
             )
         self._config.language = self._lang.currentData()
         self._config.hotkey = self._hotkey.text().strip() or self._config.hotkey

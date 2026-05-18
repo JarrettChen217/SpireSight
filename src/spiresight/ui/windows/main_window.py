@@ -251,7 +251,7 @@ class MainWindow(QMainWindow):
         self._store.save(self._config)
 
     def _open_settings(self) -> None:
-        dlg = SettingsDialog(self._config, self)
+        dlg = SettingsDialog(self._config, self._store, self)
         if dlg.exec():
             self._store.save(self._config)
             self._loader.reload(language=self._config.language)
