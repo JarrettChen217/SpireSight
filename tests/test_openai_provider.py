@@ -1,5 +1,6 @@
 # tests/test_openai_provider.py
 import base64
+import json as _json
 import threading
 
 import httpx
@@ -212,3 +213,65 @@ def test_build_user_content_three_images_preserves_order():
     assert result[0]["type"] == "text"
     for i, (part, expected_png) in enumerate(zip(result[1:], pngs), start=1):
         assert part["type"] == "image_url"
+
+
+
+@respx.mock
+def test_stream_request_includes_stream_options_include_usage():
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=_sse('{"choices":[{"delta":{"content":"hi"},"finish_reason":"stop"}]}'),
+        )
+    )
+    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
+    list(p.stream(
+        model="gpt-4o", system="s", user_text="u",
+        images=[], cancel_event=threading.Event(),
+    ))
+    body = _json.loads(route.calls.last.request.content.decode())
+    assert body.get("stream_options") == {"include_usage": True}
+
+
+@respx.mock
+def test_stream_yields_usage_on_trailing_chunk():
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=_sse(
+                '{"choices":[{"delta":{"content":"Hello"}}]}',
+                '{"choices":[{"delta":{},"finish_reason":"stop"}]}',
+                '{"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":34,"total_tokens":46}}',
+            ),
+        )
+    )
+    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
+    chunks = list(p.stream(
+        model="gpt-4o", system="s", user_text="hi",
+        images=[], cancel_event=threading.Event(),
+    ))
+    usage_chunks = [c for c in chunks if c.usage is not None]
+    assert len(usage_chunks) == 1
+    assert usage_chunks[0].usage.input_tokens == 12
+    assert usage_chunks[0].usage.output_tokens == 34
+
+
+@respx.mock
+def test_stream_without_usage_field_yields_no_usage_chunk():
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=_sse(
+                '{"choices":[{"delta":{"content":"x"},"finish_reason":"stop"}]}',
+            ),
+        )
+    )
+    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
+    chunks = list(p.stream(
+        model="gpt-4o", system="s", user_text="hi",
+        images=[], cancel_event=threading.Event(),
+    ))
+    assert all(c.usage is None for c in chunks)

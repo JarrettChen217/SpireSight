@@ -1,0 +1,26 @@
+repos:
+  # Ruff: lint (and auto-fix) only the files touched in the commit.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.13
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  # Mypy and pytest run against the project's own .venv.
+  # Run `pip install -e .[dev]` inside .venv if either hook is "not found".
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: .venv/bin/mypy
+        args: [src/]
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: pytest
+        name: pytest
+        entry: .venv/bin/pytest
+        language: system
+        pass_filenames: false
+        always_run: true

@@ -1,0 +1,56 @@
+# USD per 1M tokens. Hand-maintained.
+# Sourced from OpenAI's public pricing page (as of 2026-05-17).
+# Future-model entries (gpt-5.x) are placeholders — verify before relying on them.
+
+gpt-4o:
+  input_per_1m: 2.50
+  output_per_1m: 10.00
+
+gpt-4o-mini:
+  input_per_1m: 0.15
+  output_per_1m: 0.60
+
+gpt-4-turbo:
+  input_per_1m: 10.00
+  output_per_1m: 30.00
+
+gpt-4.1:
+  input_per_1m: 2.00
+  output_per_1m: 8.00
+
+gpt-4.5:
+  input_per_1m: 5.00
+  output_per_1m: 15.00
+
+gpt-3.5-turbo:
+  input_per_1m: 0.50
+  output_per_1m: 1.50
+
+o3:
+  input_per_1m: 10.00
+  output_per_1m: 40.00
+
+o4-mini:
+  input_per_1m: 1.10
+  output_per_1m: 4.40
+
+# Placeholders — replace with real numbers when these models launch:
+gpt-5:
+  input_per_1m: 5.00
+  output_per_1m: 15.00
+
+gpt-5.1:
+  input_per_1m: 5.00
+  output_per_1m: 15.00
+
+gpt-5.2:
+  input_per_1m: 5.00
+  output_per_1m: 15.00
+
+gpt-5.4:
+  input_per_1m: 5.00
+  output_per_1m: 15.00
+
+gpt-5.5:
+  input_per_1m: 5.00
+  output_per_1m: 15.00

@@ -61,3 +61,15 @@ logs:
   empty: "No events recorded."
   copy_all: "Copy all"
   clear: "Clear"
+
+usage:
+  tooltip:
+    input: "Session input tokens"
+    output: "Session output tokens"
+    cost: "Estimated session cost"
+    unpriced: "(some calls unpriced)"
+  light:
+    idle: "No requests yet"
+    running: "Request in progress"
+    ok: "Last request succeeded"
+    error: "Last request failed"

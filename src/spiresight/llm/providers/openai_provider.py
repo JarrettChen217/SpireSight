@@ -16,6 +16,7 @@ from typing import Final
 import httpx
 
 from spiresight.config.schema import ProviderConfig
+from spiresight.core.usage import TokenUsage
 from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import AuthError, MissingAPIKey, NetworkError, RateLimitError
 from spiresight.llm.models import ModelInfo
@@ -93,6 +94,7 @@ class OpenAIProvider:
         payload = {
             "model": model,
             "stream": True,
+            "stream_options": {"include_usage": True},
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": self._build_user_content(user_text, images)},
@@ -148,6 +150,22 @@ class OpenAIProvider:
                 obj = json.loads(data)
             except json.JSONDecodeError:
                 continue
+
+            # Usage block arrives in a trailing chunk whose `choices` is empty.
+            # When `stream_options.include_usage` is true, OpenAI sends one such
+            # chunk after the finish_reason chunk. We always yield it as a
+            # standalone StreamChunk so the caller can attribute totals.
+            usage_obj = obj.get("usage")
+            if usage_obj:
+                yield StreamChunk(
+                    text_delta="",
+                    finish_reason=None,
+                    usage=TokenUsage(
+                        input_tokens=int(usage_obj.get("prompt_tokens", 0)),
+                        output_tokens=int(usage_obj.get("completion_tokens", 0)),
+                    ),
+                )
+
             choices = obj.get("choices") or []
             if not choices:
                 continue

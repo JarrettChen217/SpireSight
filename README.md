@@ -15,6 +15,25 @@ python -m spiresight
 
 On first run, open **App → Settings → API Keys** and paste your OpenAI key.
 
+## Development setup
+
+After cloning, install deps and register the pre-commit hooks:
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+.venv/bin/pre-commit install
+```
+
+Every `git commit` will then run **ruff** (lint + auto-fix), **mypy**, and
+**pytest** automatically. All three must pass before the commit is recorded.
+
+To run the checks manually at any time:
+
+```bash
+.venv/bin/pre-commit run --all-files
+```
+
 ## macOS: Accessibility permission
 
 The global hotkey (`Ctrl/Cmd + Shift + S` by default) needs Accessibility
