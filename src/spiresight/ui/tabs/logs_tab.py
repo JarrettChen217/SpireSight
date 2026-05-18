@@ -80,7 +80,7 @@ class LogsTab(QWidget):
     # ---- request rows (new) ----
 
     def log_request(self, record: RequestLog) -> None:
-        row = LogRow(record)
+        row = LogRow(record, locale=self._locale)
         self._rows[record.correlation_id] = row
         self._insert(row)
 

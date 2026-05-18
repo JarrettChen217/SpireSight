@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from spiresight.core.usage import LogStatus, RequestLog
+from spiresight.prompts.ui_locale import UILocale
 
 
 _MONOSPACE_QSS = "font-family: ui-monospace, Menlo, monospace; font-size: 11px;"
@@ -34,8 +35,22 @@ def _format_header(record: RequestLog) -> str:
     return f"[{ts}] [{record.status}] {record.provider}/{record.model} · {record.correlation_id}"
 
 
+def _loc(locale: UILocale | None, key: str, fallback: str) -> str:
+    if locale is None:
+        return fallback
+    try:
+        return locale.get(key)
+    except KeyError:
+        return fallback
+
+
 class LogRow(QFrame):
-    def __init__(self, record: RequestLog, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        record: RequestLog,
+        parent: QWidget | None = None,
+        locale: UILocale | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("LogRow")
         self.setProperty("status", record.status)
@@ -56,7 +71,7 @@ class LogRow(QFrame):
         header_layout.addWidget(self._chevron)
         header_layout.addWidget(self._summary, stretch=1)
         self._copy_btn = QToolButton()
-        self._copy_btn.setText("Copy")
+        self._copy_btn.setText(_loc(locale, "logs.copy_row", "Copy"))
         self._copy_btn.clicked.connect(self._on_copy)
         header_layout.addWidget(self._copy_btn)
         outer.addWidget(self._header)
@@ -66,12 +81,14 @@ class LogRow(QFrame):
         body_layout.setContentsMargins(20, 2, 2, 6)
         body_layout.setSpacing(2)
 
-        self._sys_label, self._sys_edit = _make_section("System prompt")
+        sys_title = _loc(locale, "logs.section.system", "System prompt")
+        self._sys_label, self._sys_edit = _make_section(sys_title)
         self._sys_edit.setPlainText(record.system)
         body_layout.addWidget(self._sys_label)
         body_layout.addWidget(self._sys_edit)
 
-        self._msgs_label = QLabel(f"Messages ({len(record.messages)})")
+        msgs_title = _loc(locale, "logs.section.messages", "Messages")
+        self._msgs_label = QLabel(f"{msgs_title} ({len(record.messages)})")
         self._msgs_label.setStyleSheet("font-weight: 600; padding-top: 4px;")
         body_layout.addWidget(self._msgs_label)
         msg_text_parts: list[str] = []
@@ -85,15 +102,18 @@ class LogRow(QFrame):
         self._msgs_edit.setMaximumBlockCount(_TRUNCATE_LIMIT)
         body_layout.addWidget(self._msgs_edit)
 
-        self._params_label, self._params_edit = _make_section("Params")
+        params_title = _loc(locale, "logs.section.params", "Params")
+        self._params_label, self._params_edit = _make_section(params_title)
         self._params_edit.setPlainText(
             "\n".join(f"{k}: {v!r}" for k, v in record.params.items())
         )
         body_layout.addWidget(self._params_label)
         body_layout.addWidget(self._params_edit)
 
-        self._resp_label, self._response = _make_section("Response")
-        self._response.setPlainText("[streaming…]")
+        resp_title = _loc(locale, "logs.section.response", "Response")
+        self._resp_label, self._response = _make_section(resp_title)
+        streaming_text = _loc(locale, "logs.streaming_placeholder", "[streaming…]")
+        self._response.setPlainText(streaming_text)
         body_layout.addWidget(self._resp_label)
         body_layout.addWidget(self._response)
 
