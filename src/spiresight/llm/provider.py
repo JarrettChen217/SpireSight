@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from spiresight.core.usage import TokenUsage
 from .models import ModelInfo
 
 
@@ -13,6 +14,7 @@ from .models import ModelInfo
 class StreamChunk:
     text_delta: str
     finish_reason: str | None = None
+    usage: TokenUsage | None = None
 
 
 @runtime_checkable
