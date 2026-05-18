@@ -110,24 +110,23 @@ class InferenceRunner:
     def snapshot_inspect(self, images: list[bytes]) -> RequestSnapshot: ...
 ```
 
-`run_quick_action` becomes:
+`RequestSnapshot.messages` is the canonical form even for `run_quick_action` (which historically used `user_text + images`): the snapshot wraps the single quick-action turn into one `Message(role="user", text=user_text, image_png=image_png)`. `provider.stream()` already supports a `messages` parameter (introduced for follow-up), so all three run paths converge on:
 
 ```python
 def run_quick_action(self, request, *, cancel_event):
     snap = self.snapshot_quick_action(request)
-    provider, model = self._get_provider_and_model()
-    # capability check stays here
+    provider, _ = self._get_provider_and_model()
+    # capability check stays here, using snap.model + snap.params
     yield from provider.stream(
         model=snap.model,
         system=snap.system,
-        user_text=...,                   # derived from snap.messages[-1].text
-        images=[m.image_png for m in snap.messages if m.role == "user" and m.image_png],
+        messages=list(snap.messages),
         cancel_event=cancel_event,
         json_mode=snap.params.get("json_mode", False),
     )
 ```
 
-The same pattern applies to `run_follow_up` and `inspect`. Snapshot construction is the single place where the system block is composed, so UI and execution can never disagree.
+`run_follow_up` and `inspect` follow the identical shape. Snapshot construction is the single place where the system block is composed and messages are assembled, so UI logging and execution can never disagree.
 
 ## 6. Worker integration (`ui/workers/`)
 
@@ -140,9 +139,14 @@ class InferenceWorker(QThread):
     # (correlation_id, status: LogStatus, response_text, error_or_None)
 ```
 
-Factory changes (`for_quick_action`, `for_follow_up`): accept the runner, call `runner.snapshot_quick_action(request)` (or follow_up variant) inside the factory, and store the resulting `RequestSnapshot` plus a freshly generated `correlation_id` on the worker. The image-summary text is computed here by reading `Image.open(io.BytesIO(png))` and formatting `f"PNG, {len(png)//1024} KB, {im.width}×{im.height}"`.
+Factory changes (`for_quick_action`, `for_follow_up`): accept the runner, call `runner.snapshot_quick_action(request)` (or follow_up variant) inside the factory, and store on the worker:
 
-For `InspectWorker`, the same wiring: caller passes runner + frames; worker's `__init__` calls `runner.snapshot_inspect(frames)` and stores the snapshot.
+- `self._snapshot: RequestSnapshot` — the assembled snapshot.
+- `self._correlation_id: str` — freshly generated via `uuid4().hex[:8]`.
+
+For `InspectWorker`, the same wiring: caller passes runner + frames; worker's `__init__` calls `runner.snapshot_inspect(frames)` and stores `_snapshot` + `_correlation_id`.
+
+`_build_request_log()` is a helper on the worker that combines `self._snapshot`, `self._correlation_id`, and `datetime.now(tz=timezone.utc)` into a `RequestLog`. Image-summary text for each `LoggedMessage` is computed here by `Image.open(io.BytesIO(png))` and formatting `f"PNG, {len(png)//1024} KB, {im.width}×{im.height}"`. PIL decodes the PNG header only — cheap; runs in the worker thread, not the UI thread.
 
 `run()` skeleton (applies to both workers):
 
