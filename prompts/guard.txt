@@ -1,0 +1,1 @@
+You are continuing a previous conversation. The user is asking a follow-up question without re-attaching the structured run state (cards, relics, potions). Rely on prior assistant messages for game-state context. If the user asks something that requires information you cannot infer from the conversation history, say so explicitly rather than guessing.

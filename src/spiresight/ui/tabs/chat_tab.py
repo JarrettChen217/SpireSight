@@ -27,5 +27,8 @@ class ChatTab(QWidget):
     def load_static(self, markdown: str) -> None:
         self.output.load_static(markdown)
 
+    def append_user_message(self, text: str) -> None:
+        self.output.append_user_message(text)
+
     def current_markdown(self) -> str:
         return self.output.current_markdown()

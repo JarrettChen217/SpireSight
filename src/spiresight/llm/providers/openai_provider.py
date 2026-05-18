@@ -81,24 +81,33 @@ class OpenAIProvider:
         *,
         model: str,
         system: str,
-        user_text: str,
-        images: list[bytes],
-        cancel_event: threading.Event,
+        user_text: str = "",
+        images: list[bytes] = (),  # type: ignore[assignment]
+        cancel_event: threading.Event = None,  # type: ignore[assignment]
         json_mode: bool = False,
+        messages: list | None = None,
     ) -> Iterator[StreamChunk]:
         if not self._config.api_key:
             raise MissingAPIKey(self.name)
+        if cancel_event is None:
+            cancel_event = threading.Event()
 
         base_url = (self._config.base_url or _DEFAULT_BASE).rstrip("/")
         url = f"{base_url}/chat/completions"
+
+        if messages is not None:
+            api_messages = self._build_messages(system, messages)
+        else:
+            api_messages = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": self._build_user_content(user_text, images)},
+            ]
+
         payload = {
             "model": model,
             "stream": True,
             "stream_options": {"include_usage": True},
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": self._build_user_content(user_text, images)},
-            ],
+            "messages": api_messages,
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
@@ -135,6 +144,24 @@ class OpenAIProvider:
                 "image_url": {"url": f"data:image/png;base64,{b64}"},
             })
         return parts
+
+    @staticmethod
+    def _build_messages(system: str, messages: list) -> list[dict]:
+        """Build OpenAI-format messages array from conversation history."""
+        result: list[dict] = [{"role": "system", "content": system}]
+        for m in messages:
+            if m.image_png is not None and m.role == "user":
+                b64 = base64.b64encode(m.image_png).decode()
+                result.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": m.text},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                    ],
+                })
+            else:
+                result.append({"role": m.role, "content": m.text})
+        return result
 
     @staticmethod
     def _parse_sse(resp: httpx.Response, cancel_event: threading.Event) -> Iterator[StreamChunk]:

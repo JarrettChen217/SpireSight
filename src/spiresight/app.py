@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from spiresight.config import paths
 from spiresight.config.store import ConfigStore
+from spiresight.core.conversation import ConversationStore
 from spiresight.hotkey.manager import HotkeyManager, HotkeyRegistrationFailed
 from spiresight.logging_setup import configure_logging
 from spiresight.prompts.loader import PromptLoader
@@ -57,7 +58,7 @@ def run() -> int:
     qt_app = QApplication(sys.argv)
     qt_app.setStyleSheet(load_qss(config.theme))
 
-    window = MainWindow(config, store, loader, pricing=pricing)
+    window = MainWindow(config, store, loader, pricing=pricing, conversation_store=ConversationStore())
     window.show()
 
     hotkey_mgr: HotkeyManager | None = None
