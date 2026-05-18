@@ -451,6 +451,8 @@ class MainWindow(QMainWindow):
         self._worker.run_started.connect(self._tracker.call_started)
         self._worker.usage_recorded.connect(self._on_usage_recorded)
         self._worker.cancelled.connect(self._tracker.call_cancelled)
+        self._worker.request_logged.connect(self._logs_tab.log_request)
+        self._worker.response_logged.connect(self._logs_tab.update_response)
         self._worker.start()
 
     def _on_chunk(self, text: str) -> None:
@@ -532,6 +534,8 @@ class MainWindow(QMainWindow):
         self._worker.run_started.connect(self._tracker.call_started)
         self._worker.usage_recorded.connect(self._on_usage_recorded)
         self._worker.cancelled.connect(self._tracker.call_cancelled)
+        self._worker.request_logged.connect(self._logs_tab.log_request)
+        self._worker.response_logged.connect(self._logs_tab.update_response)
         self._worker.start()
 
     def _on_cancel(self) -> None:
@@ -661,6 +665,8 @@ class MainWindow(QMainWindow):
         self._worker.run_started.connect(self._tracker.call_started)
         self._worker.usage_recorded.connect(self._on_usage_recorded)
         self._worker.cancelled.connect(self._tracker.call_cancelled)
+        self._worker.request_logged.connect(self._logs_tab.log_request)
+        self._worker.response_logged.connect(self._logs_tab.update_response)
         self._worker.start()
 
     def _on_follow_up_finished(self) -> None:
@@ -727,6 +733,8 @@ class MainWindow(QMainWindow):
         self._inspect_worker = InspectWorker(runner, frames, self)
         self._inspect_worker.ready.connect(self._on_inspect_ready)
         self._inspect_worker.failed.connect(self._on_inspect_failed)
+        self._inspect_worker.request_logged.connect(self._logs_tab.log_request)
+        self._inspect_worker.response_logged.connect(self._logs_tab.update_response)
         self._inspect_worker.start()
 
     def _on_clear_requested(self) -> None:
