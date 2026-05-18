@@ -10,7 +10,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeGuard
 
 import yaml
 from PySide6.QtCore import QObject, Signal
@@ -116,7 +116,7 @@ class PricingTable:
         return (usage.input_tokens / 1_000_000) * in_rate + (usage.output_tokens / 1_000_000) * out_rate
 
 
-def _is_non_negative_number(v: object) -> bool:
+def _is_non_negative_number(v: object) -> TypeGuard[int | float]:
     return isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0
 
 
