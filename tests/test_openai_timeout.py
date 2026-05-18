@@ -1,4 +1,4 @@
-import httpx
+import openai
 import pytest
 
 from spiresight.config.schema import ProviderConfig
@@ -7,28 +7,29 @@ from spiresight.llm.provider import ProviderOptions
 from spiresight.llm.providers.openai_provider import OpenAIProvider
 
 
-def test_openai_provider_stores_options():
+def test_openai_provider_stores_options(monkeypatch):
+    monkeypatch.setattr(
+        "spiresight.llm.providers.openai_provider.OpenAI",
+        lambda **kw: type("F", (), {"chat": None, "models": None})(),
+    )
     p = OpenAIProvider(ProviderConfig(api_key="sk-x"), ProviderOptions(request_timeout_seconds=42))
     assert p._options.request_timeout_seconds == 42
 
 
-def test_openai_provider_wraps_httpx_timeout(monkeypatch):
-    """Simulate httpx.ReadTimeout during stream() and assert RequestTimeoutError is raised."""
+def test_openai_provider_wraps_api_timeout(monkeypatch):
+    exc = openai.APITimeoutError(request=None)
 
-    class _FakeStream:
-        def __enter__(self): return self
-        def __exit__(self, *exc): return False
-        def __init__(self, *a, **kw):
-            raise httpx.ReadTimeout("read timed out")
+    class FakeCompletions:
+        def create(self, **kwargs):
+            raise exc
 
-    class _FakeClient:
-        def __init__(self, *a, **kw): pass
-        def __enter__(self): return self
-        def __exit__(self, *exc): return False
-        def stream(self, *a, **kw): return _FakeStream()
+    class FakeChat:
+        def __init__(self): self.completions = FakeCompletions()
 
-    monkeypatch.setattr(httpx, "Client", _FakeClient)
-
+    monkeypatch.setattr(
+        "spiresight.llm.providers.openai_provider.OpenAI",
+        lambda **kw: type("F", (), {"chat": FakeChat(), "models": None})(),
+    )
     p = OpenAIProvider(
         ProviderConfig(api_key="sk-x"),
         ProviderOptions(request_timeout_seconds=5),

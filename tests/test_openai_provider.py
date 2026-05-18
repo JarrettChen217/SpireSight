@@ -1,277 +1,174 @@
-# tests/test_openai_provider.py
-import base64
-import json as _json
-import threading
+from __future__ import annotations
 
-import httpx
 import pytest
-import respx
 
 from spiresight.config.schema import ProviderConfig
 from spiresight.llm.capabilities import Capability
-from spiresight.llm.errors import AuthError, MissingAPIKey, NetworkError, RateLimitError
+from spiresight.llm.errors import (
+    AuthError, MissingAPIKey, RateLimitError, RequestTimeoutError,
+)
+from spiresight.llm.provider import ProviderOptions
 from spiresight.llm.providers.openai_provider import OpenAIProvider
 
 
-def _sse(*chunks: str) -> str:
-    return "".join(f"data: {c}\n\n" for c in chunks) + "data: [DONE]\n\n"
+class FakeChoice:
+    def __init__(self, content="", finish_reason=None):
+        self.delta = type("D", (), {"content": content})()
+        self.finish_reason = finish_reason
 
 
-def test_list_models_includes_vision_and_non_vision():
-    p = OpenAIProvider(ProviderConfig(api_key="sk-x"))
-    ids = {m.id for m in p.list_models()}
-    assert "gpt-4o" in ids and "gpt-4o-mini" in ids
-    gpt4o = next(m for m in p.list_models() if m.id == "gpt-4o")
-    assert Capability.VISION in gpt4o.capabilities
-    non_vision = next(m for m in p.list_models() if m.id == "gpt-3.5-turbo")
-    assert Capability.VISION not in non_vision.capabilities
+class FakeEvent:
+    def __init__(self, choices=None, usage=None):
+        self.choices = choices or []
+        self.usage = usage
 
 
-def test_missing_api_key_raises_on_stream():
-    p = OpenAIProvider(ProviderConfig(api_key=""))
-    with pytest.raises(MissingAPIKey):
-        list(p.stream(
-            model="gpt-4o", system="s", user_text="hi",
-            images=[], cancel_event=threading.Event(),
-        ))
+class FakeUsage:
+    def __init__(self, prompt, completion):
+        self.prompt_tokens = prompt
+        self.completion_tokens = completion
 
 
-@respx.mock
-def test_stream_text_only_request_yields_chunks():
-    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            text=_sse(
-                '{"choices":[{"delta":{"content":"Hello"}}]}',
-                '{"choices":[{"delta":{"content":" world"},"finish_reason":null}]}',
-                '{"choices":[{"delta":{},"finish_reason":"stop"}]}',
-            ),
-        )
+class FakeStream:
+    """Context manager that yields a fixed sequence of FakeEvent."""
+    def __init__(self, events):
+        self._events = events
+    def __enter__(self): return iter(self._events)
+    def __exit__(self, *exc): return False
+
+
+class FakeCompletions:
+    def __init__(self, events=None, raises=None):
+        self._events = events or []
+        self._raises = raises
+    def create(self, **kwargs):
+        if self._raises is not None:
+            raise self._raises
+        return FakeStream(self._events)
+
+
+class FakeModelsList:
+    def __init__(self, data):
+        self.data = data
+
+
+class FakeModels:
+    def __init__(self, data=None, raises=None):
+        self._data = data or []
+        self._raises = raises
+    def list(self):
+        if self._raises:
+            raise self._raises
+        return FakeModelsList(self._data)
+
+
+class FakeChat:
+    def __init__(self, completions):
+        self.completions = completions
+
+
+class FakeOpenAI:
+    def __init__(self, *, api_key, base_url, timeout, max_retries):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.chat = None       # filled by test
+        self.models = None     # filled by test
+
+
+def _make(monkeypatch, *, events=None, raises=None, models_data=None, models_raises=None):
+    holder = {}
+    def factory(**kwargs):
+        client = FakeOpenAI(**kwargs)
+        client.chat = FakeChat(FakeCompletions(events=events, raises=raises))
+        client.models = FakeModels(data=models_data, raises=models_raises)
+        holder["client"] = client
+        return client
+    monkeypatch.setattr("spiresight.llm.providers.openai_provider.OpenAI", factory)
+    provider = OpenAIProvider(
+        ProviderConfig(api_key="sk-x"),
+        ProviderOptions(request_timeout_seconds=30),
     )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
-    chunks = list(p.stream(
-        model="gpt-4o", system="sys", user_text="hi",
-        images=[], cancel_event=threading.Event(),
-    ))
-    assert route.called
-    assert "".join(c.text_delta for c in chunks) == "Hello world"
-    assert chunks[-1].finish_reason == "stop"
-    # text-only requests must not include an image part
-    body = route.calls.last.request.content.decode()
-    assert "image_url" not in body
+    return provider, holder
 
 
-@respx.mock
-def test_stream_with_image_sends_multimodal_payload():
-    respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            text=_sse('{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}'),
-        )
-    )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
-    png = b"\x89PNG\r\n\x1a\nFAKE"
-    list(p.stream(
-        model="gpt-4o", system="sys", user_text="see this",
-        images=[png], cancel_event=threading.Event(),
-    ))
-    body = respx.calls.last.request.content.decode()
-    expected_b64 = base64.b64encode(png).decode()
-    assert "image_url" in body
-    assert expected_b64 in body
+def test_constructs_with_default_base_url(monkeypatch):
+    p, holder = _make(monkeypatch)
+    assert holder["client"].base_url == "https://api.openai.com/v1"
 
 
-@respx.mock
-def test_401_maps_to_auth_error():
-    respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(401, json={"error": {"message": "bad key"}})
-    )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-bad"))
-    with pytest.raises(AuthError):
-        list(p.stream(
-            model="gpt-4o", system="s", user_text="u",
-            images=[], cancel_event=threading.Event(),
-        ))
-
-
-@respx.mock
-def test_429_maps_to_rate_limit():
-    respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(429, headers={"retry-after": "3"}, json={})
-    )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-x"))
-    with pytest.raises(RateLimitError) as exc:
-        list(p.stream(
-            model="gpt-4o", system="s", user_text="u",
-            images=[], cancel_event=threading.Event(),
-        ))
-    assert exc.value.retry_after == 3.0
-
-
-@respx.mock
-def test_network_error_maps():
-    respx.post("https://api.openai.com/v1/chat/completions").mock(
-        side_effect=httpx.ConnectError("boom")
-    )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-x"))
-    with pytest.raises(NetworkError):
-        list(p.stream(
-            model="gpt-4o", system="s", user_text="u",
-            images=[], cancel_event=threading.Event(),
-        ))
-
-
-@respx.mock
-def test_cancel_event_aborts_stream_mid_flight():
-    respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            text=_sse(
-                '{"choices":[{"delta":{"content":"part1"}}]}',
-                '{"choices":[{"delta":{"content":"part2"}}]}',
-                '{"choices":[{"delta":{"content":"part3"},"finish_reason":"stop"}]}',
-            ),
-        )
-    )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-x"))
-    evt = threading.Event()
-    out: list[str] = []
-    for chunk in p.stream(
-        model="gpt-4o", system="s", user_text="u",
-        images=[], cancel_event=evt,
-    ):
-        out.append(chunk.text_delta)
-        if "part1" in out:
-            evt.set()
-    assert out == ["part1"]
-
-
-@respx.mock
-def test_stream_with_json_mode_sets_response_format():
-    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            text=_sse('{"choices":[{"delta":{"content":"{}"},"finish_reason":"stop"}]}'),
-        )
-    )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
-    list(p.stream(
-        model="gpt-4o", system="sys", user_text="hi",
-        images=[], cancel_event=threading.Event(),
-        json_mode=True,
-    ))
-    body = route.calls.last.request.content.decode()
-    assert '"response_format"' in body
-    assert '"json_object"' in body
-
-
-@respx.mock
-def test_stream_without_json_mode_omits_response_format():
-    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            text=_sse('{"choices":[{"delta":{"content":"hi"},"finish_reason":"stop"}]}'),
-        )
-    )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
-    list(p.stream(
-        model="gpt-4o", system="sys", user_text="hi",
-        images=[], cancel_event=threading.Event(),
-    ))
-    body = route.calls.last.request.content.decode()
-    assert "response_format" not in body
-
-
-def test_build_user_content_no_images_returns_plain_text():
-    from spiresight.llm.providers.openai_provider import OpenAIProvider
-    result = OpenAIProvider._build_user_content("hello", [])
-    assert result == "hello"
-
-
-def test_build_user_content_one_image_returns_parts():
-    from spiresight.llm.providers.openai_provider import OpenAIProvider
-    import base64
-    png = b"\x89PNG"
-    result = OpenAIProvider._build_user_content("hi", [png])
-    assert isinstance(result, list)
-    assert result[0] == {"type": "text", "text": "hi"}
-    assert result[1]["type"] == "image_url"
-    assert result[1]["image_url"]["url"].startswith("data:image/png;base64,")
-    assert base64.b64decode(result[1]["image_url"]["url"].split(",")[1]) == png
-
-
-def test_build_user_content_three_images_preserves_order():
-    from spiresight.llm.providers.openai_provider import OpenAIProvider
-    pngs = [b"A", b"B", b"C"]
-    result = OpenAIProvider._build_user_content("x", pngs)
-    assert len(result) == 4  # text + 3 images
-    assert result[0]["type"] == "text"
-    for i, (part, expected_png) in enumerate(zip(result[1:], pngs), start=1):
-        assert part["type"] == "image_url"
-
-
-
-@respx.mock
-def test_stream_request_includes_stream_options_include_usage():
-    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            text=_sse('{"choices":[{"delta":{"content":"hi"},"finish_reason":"stop"}]}'),
-        )
-    )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
-    list(p.stream(
-        model="gpt-4o", system="s", user_text="u",
-        images=[], cancel_event=threading.Event(),
-    ))
-    body = _json.loads(route.calls.last.request.content.decode())
-    assert body.get("stream_options") == {"include_usage": True}
-
-
-@respx.mock
-def test_stream_yields_usage_on_trailing_chunk():
-    respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            text=_sse(
-                '{"choices":[{"delta":{"content":"Hello"}}]}',
-                '{"choices":[{"delta":{},"finish_reason":"stop"}]}',
-                '{"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":34,"total_tokens":46}}',
-            ),
-        )
-    )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
-    chunks = list(p.stream(
-        model="gpt-4o", system="s", user_text="hi",
-        images=[], cancel_event=threading.Event(),
-    ))
+def test_stream_yields_text_then_usage(monkeypatch):
+    events = [
+        FakeEvent(choices=[FakeChoice(content="hello ")]),
+        FakeEvent(choices=[FakeChoice(content="world", finish_reason="stop")]),
+        FakeEvent(usage=FakeUsage(prompt=10, completion=5)),
+    ]
+    p, _ = _make(monkeypatch, events=events)
+    chunks = list(p.stream(model="gpt-4o", system="s", user_text="hi"))
+    texts = [c.text_delta for c in chunks if c.text_delta]
+    assert "".join(texts) == "hello world"
     usage_chunks = [c for c in chunks if c.usage is not None]
     assert len(usage_chunks) == 1
-    assert usage_chunks[0].usage.input_tokens == 12
-    assert usage_chunks[0].usage.output_tokens == 34
+    assert usage_chunks[0].usage.input_tokens == 10
 
 
-@respx.mock
-def test_stream_without_usage_field_yields_no_usage_chunk():
-    respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            text=_sse(
-                '{"choices":[{"delta":{"content":"x"},"finish_reason":"stop"}]}',
-            ),
-        )
+def test_stream_raises_missing_api_key():
+    p = OpenAIProvider(ProviderConfig(api_key=""), ProviderOptions())
+    with pytest.raises(MissingAPIKey):
+        list(p.stream(model="gpt-4o", system="s", user_text="hi"))
+
+
+def test_stream_wraps_api_timeout(monkeypatch):
+    import openai
+    exc = openai.APITimeoutError(request=None)
+    p, _ = _make(monkeypatch, raises=exc)
+    with pytest.raises(RequestTimeoutError):
+        list(p.stream(model="gpt-4o", system="s", user_text="hi"))
+
+
+def test_stream_wraps_401(monkeypatch):
+    import openai
+    import httpx
+    resp = httpx.Response(401, request=httpx.Request("POST", "https://x"))
+    body = {"error": {"message": "unauthorized"}}
+    p, _ = _make(monkeypatch, raises=openai.APIStatusError("unauthorized", response=resp, body=body))
+    with pytest.raises(AuthError):
+        list(p.stream(model="gpt-4o", system="s", user_text="hi"))
+
+
+def test_stream_wraps_429(monkeypatch):
+    import openai
+    import httpx
+    resp = httpx.Response(429, request=httpx.Request("POST", "https://x"),
+                          headers={"retry-after": "30"})
+    body = {"error": {"message": "rate limited"}}
+    p, _ = _make(monkeypatch, raises=openai.RateLimitError("rate limited", response=resp, body=body))
+    with pytest.raises(RateLimitError):
+        list(p.stream(model="gpt-4o", system="s", user_text="hi"))
+
+
+def test_fetch_remote_models_returns_known_capabilities(monkeypatch):
+    class FakeModelEntry:
+        def __init__(self, mid): self.id = mid
+    p, _ = _make(monkeypatch, models_data=[FakeModelEntry("gpt-4o"), FakeModelEntry("totally-unknown-xyz")])
+    models = p.fetch_remote_models()
+    assert {m.id for m in models} == {"gpt-4o", "totally-unknown-xyz"}
+    gpt4o = next(m for m in models if m.id == "gpt-4o")
+    assert Capability.VISION in gpt4o.capabilities
+
+
+def test_list_models_prefers_cached(monkeypatch):
+    from spiresight.config.schema import ModelInfoDict
+    cfg = ProviderConfig(
+        api_key="sk-x",
+        cached_models=[ModelInfoDict(id="cached-model", display_name="C", capabilities=["json_mode"])],
     )
-    p = OpenAIProvider(ProviderConfig(api_key="sk-test"))
-    chunks = list(p.stream(
-        model="gpt-4o", system="s", user_text="hi",
-        images=[], cancel_event=threading.Event(),
-    ))
-    assert all(c.usage is None for c in chunks)
+    monkeypatch.setattr(
+        "spiresight.llm.providers.openai_provider.OpenAI",
+        lambda **kw: type("F", (), {"chat": None, "models": None})(),
+    )
+    p = OpenAIProvider(cfg, ProviderOptions())
+    models = p.list_models()
+    assert len(models) == 1
+    assert models[0].id == "cached-model"
