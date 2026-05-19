@@ -5,7 +5,7 @@ from spiresight.llm.providers.openai_provider import OpenAIProvider
 
 
 def test_registry_lists_three_providers():
-    assert set(registry.names()) == {"openai", "openai_compat", "anthropic", "gemini"}
+    assert set(registry.names()) == {"openai", "openai_compat", "pixel_api", "anthropic", "gemini"}
 
 
 def test_registry_returns_concrete_provider():
@@ -48,3 +48,19 @@ def test_make_provider_openai_compat(monkeypatch):
         ProviderOptions(),
     )
     assert p.name == "openai_compat"
+
+
+def test_make_provider_pixel_api(monkeypatch):
+    from spiresight.config.schema import ProviderConfig
+    from spiresight.llm.provider import ProviderOptions
+    from spiresight.llm import registry
+    monkeypatch.setattr(
+        "spiresight.llm.providers.pixel_api_provider.OpenAI",
+        lambda **kw: object(),
+    )
+    p = registry.make_provider(
+        "pixel_api",
+        ProviderConfig(api_key="k"),
+        ProviderOptions(),
+    )
+    assert p.name == "pixel_api"

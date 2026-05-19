@@ -11,6 +11,7 @@ def _config(tmp_path):
         providers={
             "openai": ProviderConfig(api_key=""),
             "openai_compat": ProviderConfig(api_key="", base_url=""),
+            "pixel_api": ProviderConfig(api_key=""),
             "anthropic": ProviderConfig(api_key=""),
             "gemini": ProviderConfig(api_key=""),
         }
@@ -23,7 +24,7 @@ def test_dialog_creates_pane_per_provider(qtbot, tmp_path):
     store = MagicMock(spec=ConfigStore)
     dlg = SettingsDialog(cfg, store)
     qtbot.addWidget(dlg)
-    assert set(dlg._panes.keys()) == {"openai", "openai_compat", "anthropic", "gemini"}
+    assert set(dlg._panes.keys()) == {"openai", "openai_compat", "pixel_api", "anthropic", "gemini"}
 
 
 def test_refresh_succeeded_persists_models(qtbot, tmp_path, monkeypatch):

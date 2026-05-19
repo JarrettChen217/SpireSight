@@ -43,6 +43,7 @@ from spiresight.ui.tabs.chat_tab import ChatTab
 from spiresight.ui.tabs.help_tab import HelpTab
 from spiresight.ui.tabs.history_tab import HistoryTab
 from spiresight.core.usage import CallRecord, PricingTable, UsageTracker
+from spiresight.ui.log_bridge import LogBridge, install_bridge
 from spiresight.ui.tabs.logs_tab import LogsTab
 from spiresight.ui.tabs.run_state_tab import RunStateTab
 from spiresight.ui.tabs.screenshot_tab import ScreenshotTab
@@ -150,6 +151,11 @@ class MainWindow(QMainWindow):
         self._history_tab.resend_requested.connect(self._on_resend)
         self._screenshot_tab = ScreenshotTab(self._screenshot_store, self._ui_locale)
         self._logs_tab = LogsTab(self._ui_locale)
+        # Pipe `logging.INFO` from spiresight.* loggers into the LogsTab so
+        # per-stage timing logs from the inference pipeline are visible in-app.
+        self._log_bridge = LogBridge(self)
+        self._log_bridge.record_emitted.connect(self._logs_tab.log)
+        install_bridge(self._log_bridge)
         self._help_tab = HelpTab(self._loader._root / "locales", self._ui_locale)
 
         loc = self._ui_locale

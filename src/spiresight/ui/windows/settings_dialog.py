@@ -16,6 +16,7 @@ from spiresight.llm import registry
 from spiresight.llm.errors import MissingAPIKey, MissingBaseURL
 from spiresight.llm.provider import ProviderOptions
 from spiresight.llm.providers.openai_compat_provider import RELAY_PRESETS
+from spiresight.llm.providers.pixel_api_provider import PIXEL_API_BASE_URL
 from spiresight.ui.widgets.provider_pane import ProviderPane
 from spiresight.ui.workers.model_refresh_worker import ModelRefreshWorker
 
@@ -25,6 +26,8 @@ _log = logging.getLogger(__name__)
 def _presets_for(name: str) -> dict[str, str] | None:
     if name == "openai_compat":
         return RELAY_PRESETS
+    if name == "pixel_api":
+        return {"PixelAPI default": PIXEL_API_BASE_URL}
     return None
 
 
@@ -70,7 +73,7 @@ class SettingsDialog(QDialog):
                 on_refresh=self.refresh_provider,
             )
             self._panes[name] = pane
-            nested.addTab(pane, name)
+            nested.addTab(pane, registry.display_name(name))
         return nested
 
     def refresh_provider(self, name: str) -> None:

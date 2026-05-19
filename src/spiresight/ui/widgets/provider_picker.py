@@ -30,7 +30,7 @@ class ProviderPicker(QWidget):
 
         self._provider_box = QComboBox()
         for name in registry.names():
-            self._provider_box.addItem(name.capitalize(), userData=name)
+            self._provider_box.addItem(registry.display_name(name), userData=name)
 
         model_row = QHBoxLayout()
         self._model_box = QComboBox()

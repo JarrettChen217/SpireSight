@@ -30,7 +30,7 @@ class ProviderConfig(BaseModel):
 class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
-    active_provider: Literal["openai", "openai_compat", "anthropic", "gemini"] = "openai"
+    active_provider: Literal["openai", "openai_compat", "pixel_api", "anthropic", "gemini"] = "openai"
     active_model: str = "gpt-4o"
     providers: dict[str, ProviderConfig] = Field(default_factory=dict)
     language: Literal["en", "zh"] = "en"
