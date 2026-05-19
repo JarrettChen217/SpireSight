@@ -16,22 +16,21 @@ from PySide6.QtWidgets import (
 from spiresight.prompts.ui_locale import UILocale
 
 
-class _CtrlEnterTextEdit(QPlainTextEdit):
-    """QPlainTextEdit that fires submit() on Ctrl/Cmd+Enter."""
+class _ComposeTextEdit(QPlainTextEdit):
+    """Enter sends; Shift+Enter inserts newline; Ctrl/Cmd+Enter also sends."""
 
     submit = Signal()
     cancel = Signal()
 
     def keyPressEvent(self, ev: QKeyEvent) -> None:
-        mod = ev.modifiers()
-        if ev.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and (
-            mod & Qt.KeyboardModifier.ControlModifier
-            or mod & Qt.KeyboardModifier.MetaModifier
-        ):
-            self.submit.emit()
-            return
         if ev.key() == Qt.Key.Key_Escape:
             self.cancel.emit()
+            return
+        if ev.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if ev.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                super().keyPressEvent(ev)
+                return
+            self.submit.emit()
             return
         super().keyPressEvent(ev)
 
@@ -55,7 +54,7 @@ class ComposeDock(QWidget):
         outer.setContentsMargins(8, 6, 8, 8)
         outer.setSpacing(4)
 
-        self._text = _CtrlEnterTextEdit()
+        self._text = _ComposeTextEdit()
         self._text.setPlaceholderText(locale.get("compose.placeholder"))
         self._text.setFixedHeight(64)
         self._text.submit.connect(self._on_send_or_cancel)
@@ -98,7 +97,11 @@ class ComposeDock(QWidget):
         if self._streaming:
             self.cancel_clicked.emit()
             return
-        self.send_clicked.emit(self.text(), self.include_screenshot())
+        text = self.text()
+        if not text:
+            return
+        self.send_clicked.emit(text, self.include_screenshot())
+        self.clear_text()
 
     def _on_escape(self) -> None:
         if self._streaming:

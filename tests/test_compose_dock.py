@@ -1,9 +1,12 @@
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication
 
 from spiresight.prompts.ui_locale import UILocale
+
 from spiresight.ui.widgets.compose_dock import ComposeDock
 
 
@@ -52,6 +55,36 @@ def test_set_streaming_swaps_button_label(qtwidgets_app, locale):
     assert dock._send_btn.text() == "Cancel"
     dock.set_streaming(False)
     assert dock._send_btn.text() == "Send"
+
+
+def test_enter_submits_plain_text(qtwidgets_app, locale):
+    dock = ComposeDock(locale, include_screenshot_default=False)
+    captured: list[tuple[str, bool]] = []
+    dock.send_clicked.connect(lambda t, s: captured.append((t, s)))
+    dock._text.setPlainText("hello\n")
+    dock._text.keyPressEvent(
+        QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+    )
+    QApplication.processEvents()
+    assert captured == [("hello", False)]
+    assert dock.text() == ""
+
+
+def test_shift_enter_does_not_submit(qtwidgets_app, locale):
+    dock = ComposeDock(locale, include_screenshot_default=False)
+    captured: list[tuple[str, bool]] = []
+    dock.send_clicked.connect(lambda t, s: captured.append((t, s)))
+    dock._text.setPlainText("")
+    dock._text.keyPressEvent(
+        QKeyEvent(
+            QKeyEvent.Type.KeyPress,
+            Qt.Key.Key_Return,
+            Qt.KeyboardModifier.ShiftModifier,
+        )
+    )
+    QApplication.processEvents()
+    assert captured == []
+    assert "\n" in dock._text.toPlainText()
 
 
 def test_clicking_send_while_streaming_emits_cancel(qtwidgets_app, locale):
