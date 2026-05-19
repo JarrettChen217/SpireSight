@@ -1,9 +1,10 @@
-"""Thin wrapper around OutputView so it can live as a tab."""
+"""Thin wrapper around ConversationTranscript so it can live as a tab."""
 from __future__ import annotations
 
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
-from spiresight.ui.widgets.output_view import OutputView
+from spiresight.core.messages import Message
+from spiresight.ui.widgets.conversation_transcript import ConversationTranscript
 
 
 class ChatTab(QWidget):
@@ -11,24 +12,34 @@ class ChatTab(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.output = OutputView()
-        layout.addWidget(self.output)
+        self._transcript = ConversationTranscript()
+        layout.addWidget(self._transcript)
 
-    # convenience pass-throughs
+    @property
+    def output(self) -> ConversationTranscript:
+        """Backward compatibility for tests referencing chat_tab.output."""
+        return self._transcript
+
     def reset(self) -> None:
-        self.output.reset()
+        self._transcript.reset()
 
     def append_delta(self, text: str) -> None:
-        self.output.append_delta(text)
+        self._transcript.append_delta(text)
 
     def finalize(self) -> None:
-        self.output.finalize()
+        self._transcript.finalize()
 
     def load_static(self, markdown: str) -> None:
-        self.output.load_static(markdown)
+        self._transcript.load_static(markdown)
 
     def append_user_message(self, text: str) -> None:
-        self.output.append_user_message(text)
+        self._transcript.append_user_message(text)
+
+    def begin_assistant_turn(self) -> None:
+        self._transcript.begin_assistant_turn()
+
+    def render_turns(self, turns: tuple[Message, ...]) -> None:
+        self._transcript.render_turns(turns)
 
     def current_markdown(self) -> str:
-        return self.output.current_markdown()
+        return self._transcript.current_markdown()
