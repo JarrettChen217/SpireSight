@@ -1,0 +1,18 @@
+# Gitleaks config for SpireSight.
+# Scans tracked source for accidental secret commits. Test/doc placeholders are allowlisted.
+title = "SpireSight gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Non-secret fixtures in tests, design docs, and env template"
+paths = [
+  '''(?i)tests/.+\.py''',
+  '''(?i)docs/superpowers/.+''',
+  '''\.env\.example$''',
+]
+regexes = [
+  '''(?i)api_key\s*=\s*["']missing["']''',
+  '''(?i)OPENAI_API_KEY=\s*$''',
+]
