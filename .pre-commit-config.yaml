@@ -1,4 +1,10 @@
 repos:
+  # Secret scan: blocks commits that add API keys, tokens, etc.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.26.0
+    hooks:
+      - id: gitleaks
+
   # Ruff: lint (and auto-fix) only the files touched in the commit.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.13

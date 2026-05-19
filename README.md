@@ -25,14 +25,19 @@ pip install -e ".[dev]"
 .venv/bin/pre-commit install
 ```
 
-Every `git commit` will then run **ruff** (lint + auto-fix), **mypy**, and
-**pytest** automatically. All three must pass before the commit is recorded.
+Every `git commit` will then run **gitleaks** (secret scan), **ruff** (lint +
+auto-fix), **mypy**, and **pytest** automatically. All four must pass before the
+commit is recorded.
 
 To run the checks manually at any time:
 
 ```bash
 .venv/bin/pre-commit run --all-files
 ```
+
+CI also runs [Gitleaks](https://github.com/gitleaks/gitleaks) on every push/PR
+(see `.gitleaks.toml`). Test fixtures and design-doc placeholders are
+allowlisted; do not commit real API keys.
 
 ## macOS: Accessibility permission
 
