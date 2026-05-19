@@ -5,6 +5,7 @@ import logging
 import sys
 from pathlib import Path
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from spiresight.config import paths
@@ -13,7 +14,13 @@ from spiresight.core.conversation import ConversationStore
 from spiresight.hotkey.manager import HotkeyManager, HotkeyRegistrationFailed
 from spiresight.logging_setup import configure_logging
 from spiresight.prompts.loader import PromptLoader
-from spiresight.ui.theme import load_qss
+from spiresight.ui.theme import app_icon_path, load_qss
+
+if sys.platform == "darwin":
+    from spiresight.ui.macos_dock_icon import apply_dock_icon
+else:
+    def apply_dock_icon(_path: str | None) -> bool:
+        return False
 from spiresight.ui.windows.main_window import MainWindow
 from spiresight.ui.windows.permission_dialog import PermissionDialog
 
@@ -57,6 +64,10 @@ def run() -> int:
 
     qt_app = QApplication(sys.argv)
     qt_app.setStyleSheet(load_qss(config.theme))
+    icon_file = app_icon_path()
+    if icon_file is not None:
+        qt_app.setWindowIcon(QIcon(icon_file))
+        apply_dock_icon(icon_file)
 
     window = MainWindow(config, store, loader, pricing=pricing, conversation_store=ConversationStore())
     window.show()
