@@ -5,7 +5,9 @@ Tokens here must match the values in resources/qss/dark_fantasy.qss.
 """
 from __future__ import annotations
 
+import sys
 from importlib import resources
+from pathlib import Path
 
 COLORS = {
     "bg": "#090c12",
@@ -44,3 +46,27 @@ def icon_path(name: str) -> str:
     return str(
         resources.files("spiresight.resources.icons").joinpath(f"{name}.svg")
     )
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def app_icon_path() -> str | None:
+    """RGBA PNG for QIcon / NSApplication (squircle baked in). Bundled .app on macOS: None."""
+    icons_dir = _repo_root() / "packaging" / "icons"
+
+    if getattr(sys, "frozen", False):
+        if sys.platform == "darwin":
+            return None
+        base = Path(getattr(sys, "_MEIPASS", ""))
+        for name in ("app_icon_512.png", "icon.ico"):
+            candidate = base / "spiresight" / "resources" / name
+            if candidate.is_file():
+                return str(candidate)
+        return None
+
+    dock_png = icons_dir / "app_icon_512.png"
+    if dock_png.is_file():
+        return str(dock_png)
+    return None
