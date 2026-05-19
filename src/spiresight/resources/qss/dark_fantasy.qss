@@ -456,3 +456,49 @@ QFrame#LogRow QPlainTextEdit {
     font-family: ui-monospace, Menlo, monospace;
     font-size: 11px;
 }
+
+/* ── Bubble toggle ────────────────────────────────────────── */
+QToolButton#bubble-toggle {
+    color: #6e7a89;
+    background: transparent;
+    border: none;
+    padding: 4px;
+    border-radius: 4px;
+}
+QToolButton#bubble-toggle:hover {
+    color: #d5cebf;
+    background: rgba(255, 255, 255, 8);
+}
+QToolButton#bubble-toggle:checked { color: #d4a54a; }
+QToolButton#bubble-toggle:checked:hover { color: #e6b85a; }
+
+/* ── Mini-bar inspect group ───────────────────────────────── */
+QWidget#mini-inspect QToolButton {
+    color: #d5cebf;
+    background-color: #10141e;
+    border: 1px solid #1d2233;
+    border-radius: 4px;
+}
+QWidget#mini-inspect QToolButton:hover { border-color: #3a6080; }
+QWidget#mini-inspect QToolButton:disabled {
+    color: #4a5260;
+    background-color: #0a0d14;
+    border-color: #1d2233;
+}
+QWidget#mini-inspect QToolButton#mini-inspect-capture:enabled {
+    border-color: #d4a54a;
+}
+
+/* ── Mini-bar separators ──────────────────────────────────── */
+QFrame#mini-bar-sep {
+    color: #1d2233;
+    background-color: #1d2233;
+    max-width: 1px;
+}
+
+/* ── InfoBubble size grip ─────────────────────────────────── */
+QSizeGrip {
+    width: 14px;
+    height: 14px;
+    background: transparent;
+}
