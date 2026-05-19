@@ -396,6 +396,16 @@ QLabel#bubble-user-msg {
     padding: 6px 10px;
     color: #6e7a89;
 }
+QWidget#bubble-assistant-wrap {
+    background-color: #0a0d14;
+    border: 1px solid #1d2233;
+    border-radius: 6px;
+}
+QFrame#turn-separator {
+    color: #1d2233;
+    background-color: #1d2233;
+    max-height: 1px;
+}
 QToolButton#bubble-camera {
     color: #6e7a89;
     border: 1px solid transparent;

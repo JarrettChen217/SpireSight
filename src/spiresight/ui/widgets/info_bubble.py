@@ -9,12 +9,13 @@ from __future__ import annotations
 from PySide6.QtCore import QPoint, QSize, QTimer, Qt, Signal
 from PySide6.QtGui import QPainter, QPainterPath, QBrush, QColor, QPen, QGuiApplication
 from PySide6.QtWidgets import (
-    QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSizeGrip,
+    QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizeGrip,
     QToolButton, QVBoxLayout, QWidget,
 )
 
+from spiresight.core.messages import Message
 from spiresight.core.usage import TokenUsage
-from spiresight.ui.widgets.output_view import OutputView
+from spiresight.ui.widgets.conversation_transcript import ConversationTranscript
 
 BUBBLE_WIDTH = 360
 BUBBLE_MAX_HEIGHT = 200
@@ -81,21 +82,8 @@ class InfoBubble(QWidget):
         title_row.addWidget(close_btn)
         root.addWidget(title)
 
-        # scrollable body
-        self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
-        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        self._body = QWidget()
-        self._body_layout = QVBoxLayout(self._body)
-        self._body_layout.setContentsMargins(14, 12, 14, 12)
-        self._body_layout.setSpacing(8)
-
-        self._output = OutputView()
-        self._body_layout.addWidget(self._output, stretch=1)
-
-        self._scroll.setWidget(self._body)
-        root.addWidget(self._scroll, stretch=1)
+        self._transcript = ConversationTranscript()
+        root.addWidget(self._transcript, stretch=1)
 
         # controls row
         controls = QWidget()
@@ -172,31 +160,22 @@ class InfoBubble(QWidget):
     # public API
 
     def reset(self) -> None:
-        self._output.reset()
+        self._transcript.reset()
         self._cost_label.clear()
         self._cancel_btn.hide()
         self._streaming = False
-        for i in reversed(range(self._body_layout.count())):
-            item = self._body_layout.itemAt(i)
-            if item is None:
-                continue
-            w = item.widget()
-            if w is not None and w is not self._output:
-                w.deleteLater()
 
     def append_user_message(self, text: str) -> None:
-        label = QLabel(text)
-        label.setObjectName("bubble-user-msg")
-        label.setWordWrap(True)
-        label.setTextFormat(Qt.TextFormat.PlainText)
-        idx = self._body_layout.indexOf(self._output)
-        self._body_layout.insertWidget(idx, label)
+        self._transcript.append_user_message(text)
+
+    def begin_assistant_turn(self) -> None:
+        self._transcript.begin_assistant_turn()
 
     def append_delta(self, text: str) -> None:
-        self._output.append_delta(text)
+        self._transcript.append_delta(text)
 
     def finalize(self) -> None:
-        self._output.finalize()
+        self._transcript.finalize()
         self.set_streaming(False)
 
     def set_streaming(self, active: bool) -> None:
@@ -226,28 +205,14 @@ class InfoBubble(QWidget):
         self._model_label.setText(model_id)
 
     def is_empty(self) -> bool:
-        """True iff no user-message labels and OutputView has no rendered content."""
-        for i in range(self._body_layout.count()):
-            item = self._body_layout.itemAt(i)
-            if item is None:
-                continue
-            w = item.widget()
-            if w is None or w is self._output:
-                continue
-            return False  # found a user-message label
-        return self._output.is_empty()
+        return self._transcript.is_empty()
 
-    def render_history(self, turns) -> None:
-        """Replay conversation into OutputView when toggling ON with empty bubble."""
+    def render_history(self, turns: tuple[Message, ...]) -> None:
+        """Replay conversation when toggling ON with empty bubble."""
         if not turns:
             return
         self.reset()
-        for msg in turns:
-            if msg.role == "user":
-                self.append_user_message(msg.text)
-            else:
-                self.append_delta(msg.text)
-        self.finalize()
+        self._transcript.render_turns(turns)
 
     def apply_size(self, size: QSize) -> None:
         clamped = QSize(
@@ -287,5 +252,4 @@ class InfoBubble(QWidget):
         recapture = self._cam_btn.isChecked()
         self._input.clear()
         self._cam_btn.setChecked(False)
-        self.append_user_message(text)
         self.follow_up_requested.emit(text, recapture)
