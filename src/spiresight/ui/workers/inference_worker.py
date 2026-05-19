@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import logging
 import threading
+import time
 from collections.abc import Callable, Iterator
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -137,6 +138,11 @@ class InferenceWorker(QThread):
         )
 
     def run(self) -> None:
+        t0 = time.monotonic()
+        _log.info(
+            "InferenceWorker.run started  corr=%s model=%s",
+            self._correlation_id, self._model_id,
+        )
         self.run_started.emit(self._model_id, self._input_preview)
         self.request_logged.emit(self._build_request_log())
 
@@ -145,6 +151,7 @@ class InferenceWorker(QThread):
         status: LogStatus = "ok"
         error_msg: str | None = None
         exc_to_emit: Exception | None = None
+        first_chunk_logged = False
 
         try:
             for c in self._run_fn(self._cancel):
@@ -152,6 +159,12 @@ class InferenceWorker(QThread):
                     status = "cancelled"
                     break
                 if c.text_delta:
+                    if not first_chunk_logged:
+                        _log.info(
+                            "InferenceWorker first chunk arrived  corr=%s T+%.3fs",
+                            self._correlation_id, time.monotonic() - t0,
+                        )
+                        first_chunk_logged = True
                     text_buffer.append(c.text_delta)
                     self.chunk.emit(c.text_delta)
                 if c.usage is not None:
@@ -166,6 +179,10 @@ class InferenceWorker(QThread):
             exc_to_emit = exc
         finally:
             full_text = "".join(text_buffer)
+            _log.info(
+                "InferenceWorker.run done  corr=%s status=%s total=%.3fs chars=%d",
+                self._correlation_id, status, time.monotonic() - t0, len(full_text),
+            )
             self.response_logged.emit(self._correlation_id, status, full_text, error_msg)
             if status == "cancelled":
                 self.cancelled.emit()

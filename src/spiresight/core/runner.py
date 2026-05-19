@@ -6,7 +6,9 @@ QThread-based UI integration.
 """
 from __future__ import annotations
 
+import logging
 import threading
+import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +23,8 @@ from spiresight.llm.errors import MissingAPIKey, MissingCapabilityError
 from spiresight.llm.models import ModelInfo
 from spiresight.llm.provider import LLMProvider, ProviderOptions, StreamChunk
 from spiresight.prompts.loader import PromptLoader
+
+_log = logging.getLogger(__name__)
 
 INSPECTOR_PROMPT_ID = "sts_inspector"
 INSPECTOR_USER_TEXT = (
@@ -197,6 +201,8 @@ class InferenceRunner:
         *,
         cancel_event: threading.Event,
     ) -> Iterator[StreamChunk]:
+        t0 = time.monotonic()
+        _log.info("run_quick_action: snapshotting (prompt_id=%s)", request.prompt_id)
         snap = self.snapshot_quick_action(request)
         provider, model = self._get_provider_and_model()
         qa = self._loader.get_quick_action(request.prompt_id)
@@ -204,6 +210,11 @@ class InferenceRunner:
         if missing:
             raise MissingCapabilityError(model=model.id, missing=missing)
         msg = snap.messages[0]
+        _log.info(
+            "run_quick_action: T+%.3fs calling provider %s.stream  model=%s json=%s has_image=%s",
+            time.monotonic() - t0, provider.name, snap.model,
+            snap.params.get("json_mode", False), msg.image_png is not None,
+        )
         yield from provider.stream(
             model=snap.model,
             system=snap.system,
@@ -220,8 +231,19 @@ class InferenceRunner:
         *,
         cancel_event: threading.Event,
     ) -> Iterator[StreamChunk]:
+        t0 = time.monotonic()
+        _log.info(
+            "run_follow_up: snapshotting (history=%d, recapture=%s, include_screenshot=%s)",
+            len(history), request.recapture, request.include_screenshot,
+        )
         snap = self.snapshot_follow_up(request, history)
         provider, _ = self._get_provider_and_model()
+        n_imgs = sum(1 for m in snap.messages if m.image_png is not None)
+        _log.info(
+            "run_follow_up: T+%.3fs calling provider %s.stream  model=%s msgs=%d msgs_with_image=%d",
+            time.monotonic() - t0, provider.name, snap.model,
+            len(snap.messages), n_imgs,
+        )
         yield from provider.stream(
             model=snap.model,
             system=snap.system,
