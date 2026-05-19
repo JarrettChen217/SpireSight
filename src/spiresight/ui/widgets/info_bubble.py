@@ -6,10 +6,10 @@ questions. Frameless tool window, styled via dark_fantasy.qss.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QPainter, QPainterPath, QBrush, QColor, QPen
+from PySide6.QtCore import QPoint, QSize, QTimer, Qt, Signal
+from PySide6.QtGui import QPainter, QPainterPath, QBrush, QColor, QPen, QGuiApplication
 from PySide6.QtWidgets import (
-    QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea,
+    QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSizeGrip,
     QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -45,6 +45,7 @@ class InfoBubble(QWidget):
     closed = Signal()
     cancel_requested = Signal()
     follow_up_requested = Signal(str, bool)   # (text, recapture)
+    size_changed = Signal(QSize)
 
     def __init__(self, parent=None) -> None:
         flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint
@@ -84,7 +85,6 @@ class InfoBubble(QWidget):
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll.setMaximumHeight(BUBBLE_MAX_HEIGHT)
 
         self._body = QWidget()
         self._body_layout = QVBoxLayout(self._body)
@@ -147,9 +147,27 @@ class InfoBubble(QWidget):
 
         # tail pointer — overlay widget at top-center, pointing up toward mini-bar
         self._tail = _TailWidget(self)
-        self._tail.move((BUBBLE_WIDTH - TAIL_SIZE) // 2, -TAIL_SIZE)
 
-        self.resize(BUBBLE_WIDTH, 100)
+        # size constraints
+        self.setMinimumSize(280, 140)
+        raw_max = QGuiApplication.primaryScreen().availableSize() * 0.8
+        self.setMaximumSize(QSize(int(raw_max.width()), int(raw_max.height())))
+
+        # resize grip (bottom-right, absolute positioned)
+        self._grip = QSizeGrip(self)
+        self._grip.setFixedSize(14, 14)
+
+        # debounce timer for size_changed signal
+        self._size_debounce = QTimer(self)
+        self._size_debounce.setSingleShot(True)
+        self._size_debounce.setInterval(300)
+        self._size_debounce.timeout.connect(
+            lambda: self.size_changed.emit(self.size())
+        )
+
+        self.resize(BUBBLE_WIDTH, 240)
+        self._reposition_tail()
+        self._reposition_grip()
 
     # public API
 
@@ -207,8 +225,31 @@ class InfoBubble(QWidget):
         self._chip.setText(action_label)
         self._model_label.setText(model_id)
 
+    def apply_size(self, size: QSize) -> None:
+        clamped = QSize(
+            max(self.minimumWidth(),  min(self.maximumWidth(),  size.width())),
+            max(self.minimumHeight(), min(self.maximumHeight(), size.height())),
+        )
+        self.resize(clamped)
+        # resizeEvent may not fire for hidden windows; reposition unconditionally.
+        self._reposition_tail()
+        self._reposition_grip()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._reposition_tail()
+        self._reposition_grip()
+        self._size_debounce.start()
+
+    def _reposition_tail(self) -> None:
+        self._tail.move((self.width() - TAIL_SIZE) // 2, -TAIL_SIZE)
+
+    def _reposition_grip(self) -> None:
+        self._grip.move(self.width() - 16, self.height() - 16)
+        self._grip.raise_()
+
     def move_anchored(self, anchor_pos: QPoint) -> None:
-        x = anchor_pos.x() - BUBBLE_WIDTH // 2 + TAIL_SIZE + 2
+        x = anchor_pos.x() - self.width() // 2
         y = anchor_pos.y() + TAIL_SIZE
         self.move(x, y)
 
