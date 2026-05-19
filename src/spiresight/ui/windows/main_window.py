@@ -397,12 +397,7 @@ class MainWindow(QMainWindow):
             return
         self._tabs.setCurrentIndex(_TAB_CHAT)
         self._chat_tab.reset()
-        for msg in turns:
-            if msg.role == "user":
-                self._chat_tab.append_user_message(msg.text)
-            else:
-                self._chat_tab.append_delta(msg.text)
-        self._chat_tab.finalize()
+        self._chat_tab.render_turns(turns)
 
     # ─── inference flow ──────────────────────────────────────────
 
@@ -411,17 +406,15 @@ class MainWindow(QMainWindow):
             self._on_action(self._config.last_used_prompt_id)
 
     def _on_compose_send(self, text: str, include_screenshot: bool) -> None:
+        if not text.strip():
+            return
         if self._conversation.turns():
             self._dispatch_follow_up(text, recapture=include_screenshot)
         else:
-            actions = self._loader.quick_actions()
-            if not actions:
-                return
-            action_id = self._config.last_used_prompt_id or actions[0].id
-            self._on_action(
-                action_id,
-                custom_text_override=text,
-                include_screenshot_override=include_screenshot,
+            self._dispatch_follow_up(
+                text,
+                recapture=include_screenshot,
+                fresh_session=True,
             )
 
     def _on_action(
@@ -491,6 +484,9 @@ class MainWindow(QMainWindow):
                 action_label = action_id
             self._bubble.reset()
             self._bubble.set_title(action_label, self._config.active_model)
+            if custom_text:
+                self._bubble.append_user_message(custom_text)
+            self._bubble.begin_assistant_turn()
             self._bubble.set_streaming(True)
             self._anchor_bubble_to_minibar()
             self._bubble.show()
@@ -499,6 +495,15 @@ class MainWindow(QMainWindow):
         else:
             self._tabs.setCurrentIndex(_TAB_CHAT)
             self._chat_tab.reset()
+            if custom_text:
+                self._chat_tab.append_user_message(custom_text)
+            else:
+                try:
+                    qa = self._loader.get_quick_action(action_id)
+                    self._chat_tab.append_user_message(qa.label)
+                except Exception:
+                    self._chat_tab.append_user_message(action_id)
+            self._chat_tab.begin_assistant_turn()
 
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
@@ -583,10 +588,14 @@ class MainWindow(QMainWindow):
         )
         self._tabs.setCurrentIndex(_TAB_CHAT)
         self._chat_tab.reset()
+        custom = entry.custom_text or ""
+        if custom:
+            self._chat_tab.append_user_message(custom)
+        self._chat_tab.begin_assistant_turn()
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
 
-        input_preview = self._compose_input_preview_qa(entry.prompt_id, entry.custom_text or "")
+        input_preview = self._compose_input_preview_qa(entry.prompt_id, custom)
         self._worker = InferenceWorker.for_quick_action(
             runner, request,
             model_id=self._config.active_model,
@@ -671,14 +680,23 @@ class MainWindow(QMainWindow):
         self._last_screenshot_png = None
         self._stream_buffer = []
 
-    def _dispatch_follow_up(self, text: str, recapture: bool) -> None:
+    def _dispatch_follow_up(
+        self,
+        text: str,
+        recapture: bool,
+        *,
+        fresh_session: bool = False,
+    ) -> None:
         if self._worker is not None and self._worker.isRunning():
             self._worker.cancel()
             self._worker.wait()
 
         self._last_follow_up_text = text
 
-        include_screenshot = recapture or self._conversation.last_screenshot() is not None
+        if fresh_session:
+            include_screenshot = recapture
+        else:
+            include_screenshot = recapture or self._conversation.last_screenshot() is not None
 
         request = FollowUpRequest(
             user_text=text,
@@ -688,18 +706,20 @@ class MainWindow(QMainWindow):
         history = self._conversation.turns()
 
         screenshot_png: bytes | None = None
-        if recapture:
+        if recapture or (fresh_session and include_screenshot):
             try:
                 screenshot_png = self._capture.grab_primary()
                 self._last_screenshot_png = screenshot_png
             except Exception as exc:  # noqa: BLE001
                 self._log(f"follow-up capture failed: {exc}")
+        elif fresh_session:
+            self._last_screenshot_png = None
 
         runner = InferenceRunner(
             config=self._config,
             prompt_loader=self._loader,
             provider_factory=registry.make_provider,
-            screen_capture=self._capture,
+            screen_capture=_PrecapturedScreen(screenshot_png) if screenshot_png else self._capture,
             run_state_store=None,
         )
 
@@ -708,12 +728,20 @@ class MainWindow(QMainWindow):
         is_mini = self._config.mini_bar_mode
 
         if is_mini and self._bubble is not None:
+            if fresh_session:
+                self._bubble.reset()
+                self._bubble.set_title("Chat", self._config.active_model)
+            self._bubble.append_user_message(text)
+            self._bubble.begin_assistant_turn()
             self._bubble.set_streaming(True)
             if self._mini_bar is not None:
                 self._mini_bar.set_bubble_visible(True)
         else:
             self._tabs.setCurrentIndex(_TAB_CHAT)
-            self._render_conversation()
+            if fresh_session:
+                self._chat_tab.reset()
+            self._chat_tab.append_user_message(text)
+            self._chat_tab.begin_assistant_turn()
 
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
@@ -737,14 +765,6 @@ class MainWindow(QMainWindow):
         self._worker.start()
 
     def _on_follow_up_finished(self) -> None:
-        self._compose.set_streaming(False)
-        self.statusBar().showMessage("Done.", 3000)
-
-        if self._bubble is not None and self._config.mini_bar_mode:
-            self._bubble.finalize()
-        else:
-            self._render_conversation()
-
         full_markdown = "".join(self._stream_buffer)
 
         self._conversation.append(Message(
@@ -753,6 +773,14 @@ class MainWindow(QMainWindow):
             image_png=self._last_screenshot_png,
         ))
         self._conversation.append(Message(role="assistant", text=full_markdown))
+
+        if self._bubble is not None and self._config.mini_bar_mode:
+            self._bubble.finalize()
+        else:
+            self._chat_tab.finalize()
+
+        self._compose.set_streaming(False)
+        self.statusBar().showMessage("Done.", 3000)
 
         self._last_screenshot_png = None
         self._stream_buffer = []
