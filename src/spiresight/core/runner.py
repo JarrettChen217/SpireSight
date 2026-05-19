@@ -34,17 +34,34 @@ INSPECTOR_USER_TEXT = (
 _INSPECT_CAPS = frozenset({Capability.VISION, Capability.JSON_MODE})
 
 
-def _load_guard_prompt() -> str:
-    """Locate prompts/guard.txt relative to the repo root."""
+def _load_prompt_file(name: str, *, fallback: str) -> str:
+    """Locate prompts/<name> relative to the repo root."""
     here = Path(__file__).resolve()
     for parent in here.parents:
-        candidate = parent / "prompts" / "guard.txt"
+        candidate = parent / "prompts" / name
         if candidate.exists():
             return candidate.read_text(encoding="utf-8").strip()
-    return (
-        "You are continuing a previous conversation. "
-        "Rely on prior assistant messages for context. "
-        "If you lack needed information, say so explicitly."
+    return fallback
+
+
+def _load_guard_prompt() -> str:
+    return _load_prompt_file(
+        "guard.txt",
+        fallback=(
+            "You are continuing a previous conversation. "
+            "Rely on prior assistant messages for context. "
+            "If you lack needed information, say so explicitly."
+        ),
+    )
+
+
+def _load_freeform_prompt() -> str:
+    return _load_prompt_file(
+        "freeform.txt",
+        fallback=(
+            "You are a Slay the Spire 2 strategy assistant. "
+            "Answer using the user's message and any screenshot provided."
+        ),
     )
 
 
@@ -128,7 +145,9 @@ class InferenceRunner:
         request: FollowUpRequest,
         history: tuple[Message, ...],
     ) -> RequestSnapshot:
-        guard = _load_guard_prompt()
+        system = (
+            _load_freeform_prompt() if not history else _load_guard_prompt()
+        )
         image_png: bytes | None = None
         if request.recapture:
             image_png = self._capture.grab_primary()
@@ -142,7 +161,7 @@ class InferenceRunner:
         return RequestSnapshot(
             provider=provider.name,
             model=model.id,
-            system=guard,
+            system=system,
             messages=tuple(history) + (user_msg,),
             params={"json_mode": False, "has_images": image_png is not None},
         )
