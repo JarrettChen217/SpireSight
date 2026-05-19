@@ -225,6 +225,30 @@ class InfoBubble(QWidget):
         self._chip.setText(action_label)
         self._model_label.setText(model_id)
 
+    def is_empty(self) -> bool:
+        """True iff no user-message labels and OutputView has no rendered content."""
+        for i in range(self._body_layout.count()):
+            item = self._body_layout.itemAt(i)
+            if item is None:
+                continue
+            w = item.widget()
+            if w is None or w is self._output:
+                continue
+            return False  # found a user-message label
+        return self._output.is_empty()
+
+    def render_history(self, turns) -> None:
+        """Replay conversation into OutputView when toggling ON with empty bubble."""
+        if not turns:
+            return
+        self.reset()
+        for msg in turns:
+            if msg.role == "user":
+                self.append_user_message(msg.text)
+            else:
+                self.append_delta(msg.text)
+        self.finalize()
+
     def apply_size(self, size: QSize) -> None:
         clamped = QSize(
             max(self.minimumWidth(),  min(self.maximumWidth(),  size.width())),

@@ -64,6 +64,9 @@ class OutputView(QTextBrowser):
         sb = self.verticalScrollBar()
         sb.setValue(sb.maximum())
 
+    def is_empty(self) -> bool:
+        return not self._buffer
+
     def current_markdown(self) -> str:
         return "".join(self._buffer)
 

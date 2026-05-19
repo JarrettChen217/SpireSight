@@ -56,6 +56,31 @@ def test_size_grip_present_and_bottom_right(qtwidgets_app):
     assert b._grip.y() >= b.height() - 32
 
 
+def test_is_empty_initial_true(qtwidgets_app):
+    from spiresight.ui.widgets.info_bubble import InfoBubble
+    b = InfoBubble()
+    assert b.is_empty() is True
+
+
+def test_render_history_replays_turns(qtwidgets_app):
+    from spiresight.core.messages import Message
+    from spiresight.ui.widgets.info_bubble import InfoBubble
+    b = InfoBubble()
+    turns = (
+        Message(role="user", text="hi"),
+        Message(role="assistant", text="hello back"),
+    )
+    b.render_history(turns)
+    assert b.is_empty() is False
+
+
+def test_render_history_with_empty_tuple_is_noop(qtwidgets_app):
+    from spiresight.ui.widgets.info_bubble import InfoBubble
+    b = InfoBubble()
+    b.render_history(())
+    assert b.is_empty() is True
+
+
 def test_size_changed_signal_emitted_after_debounce(qtwidgets_app):
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
