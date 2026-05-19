@@ -795,6 +795,8 @@ class MainWindow(QMainWindow):
             run_state_store=self._run_state_store,
         )
         self._inspect_panel.set_busy(True)
+        if self._mini_bar is not None:
+            self._mini_bar.set_inspect_busy(True)
         self.statusBar().showMessage(loc.get("main.inspecting", count=len(frames)))
 
         self._inspect_worker = InspectWorker(runner, frames, self)
@@ -813,12 +815,16 @@ class MainWindow(QMainWindow):
         self._run_state_store.set(state)
         self._inspect_session.clear()
         self._inspect_panel.set_busy(False)
+        if self._mini_bar is not None:
+            self._mini_bar.set_inspect_busy(False)
         self.statusBar().showMessage(self._ui_locale.get("main.run_state_captured"), 3000)
         self._inspect_worker = None
 
     def _on_inspect_failed(self, exc: Exception) -> None:
         loc = self._ui_locale
         self._inspect_panel.set_busy(False)
+        if self._mini_bar is not None:
+            self._mini_bar.set_inspect_busy(False)
         self._log(f"inspect failed: {exc.__class__.__name__}: {exc}")
         if isinstance(exc, MissingCapabilityError):
             missing = ", ".join(sorted(c.value for c in exc.missing))
