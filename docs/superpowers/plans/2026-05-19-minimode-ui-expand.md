@@ -45,7 +45,7 @@
 
 **Files:** none
 
-- [ ] **Step 1: Confirm branch + working tree clean**
+- [x] **Step 1: Confirm branch + working tree clean**
 
 ```bash
 git rev-parse --abbrev-ref HEAD
@@ -53,14 +53,14 @@ git status --short
 ```
 Expected: `feature/minimode-ui-expand`, no modified files.
 
-- [ ] **Step 2: Confirm venv + pytest-qt installed**
+- [x] **Step 2: Confirm venv + pytest-qt installed**
 
 ```bash
 .venv/bin/python -c "import PySide6, pytest, pytestqt; print(PySide6.__version__)"
 ```
 Expected: a PySide6 version string, no ImportError.
 
-- [ ] **Step 3: Baseline test run**
+- [x] **Step 3: Baseline test run**
 
 ```bash
 .venv/bin/pytest -q
@@ -75,14 +75,14 @@ Expected: all tests pass. Record the pass count for later comparison.
 - Modify: `src/spiresight/config/schema.py`
 - Test: `tests/test_config_store.py`
 
-- [ ] **Step 1: Inspect current schema**
+- [x] **Step 1: Inspect current schema**
 
 ```bash
 grep -n "always_on_top\|hotkey\|mini_bar_mode" src/spiresight/config/schema.py
 ```
 Note where the existing UI-related fields live so the new fields slot in beside them.
 
-- [ ] **Step 2: Write failing test**
+- [x] **Step 2: Write failing test**
 
 Append to `tests/test_config_store.py`:
 
@@ -119,14 +119,14 @@ def test_app_config_legacy_file_uses_defaults(tmp_path):
     assert cfg.bubble_height == 280
 ```
 
-- [ ] **Step 3: Run failing test**
+- [x] **Step 3: Run failing test**
 
 ```bash
 .venv/bin/pytest tests/test_config_store.py -q -k bubble
 ```
 Expected: FAIL — `AppConfig` has no `bubble_width` attribute.
 
-- [ ] **Step 4: Add fields to schema**
+- [x] **Step 4: Add fields to schema**
 
 In `src/spiresight/config/schema.py`, inside the `AppConfig` class body, beside `always_on_top` / `mini_bar_mode`:
 
@@ -135,21 +135,21 @@ In `src/spiresight/config/schema.py`, inside the `AppConfig` class body, beside 
     bubble_height: int = 280
 ```
 
-- [ ] **Step 5: Run test — expect pass**
+- [x] **Step 5: Run test — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_config_store.py -q -k bubble
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Re-run full suite**
+- [x] **Step 6: Re-run full suite**
 
 ```bash
 .venv/bin/pytest -q
 ```
 Expected: same pass count as baseline + 3.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/spiresight/config/schema.py tests/test_config_store.py
@@ -164,7 +164,7 @@ git commit -m "feat(config): add bubble_width/height to AppConfig"
 - Create: `src/spiresight/ui/widgets/bubble_toggle_button.py`
 - Create: `tests/test_bubble_toggle_button.py`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 `tests/test_bubble_toggle_button.py`:
 
@@ -222,14 +222,14 @@ def test_set_visible_state_same_value_is_noop(qtwidgets_app):
     assert received == []
 ```
 
-- [ ] **Step 2: Run failing test**
+- [x] **Step 2: Run failing test**
 
 ```bash
 .venv/bin/pytest tests/test_bubble_toggle_button.py -q
 ```
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement widget**
+- [x] **Step 3: Implement widget**
 
 `src/spiresight/ui/widgets/bubble_toggle_button.py`:
 
@@ -280,14 +280,14 @@ class BubbleToggleButton(QToolButton):
             self.setIcon(icon)
 ```
 
-- [ ] **Step 4: Run tests — expect pass**
+- [x] **Step 4: Run tests — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_bubble_toggle_button.py -q
 ```
 Expected: PASS (all 5).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/spiresight/ui/widgets/bubble_toggle_button.py tests/test_bubble_toggle_button.py
@@ -302,14 +302,14 @@ git commit -m "feat(ui): add BubbleToggleButton mirror widget"
 - Create: `src/spiresight/ui/widgets/inspect_controls.py` (controller portion only — badge + MiniInspectControls land in Tasks 5–6)
 - Create: `tests/test_inspect_buttons_controller.py`
 
-- [ ] **Step 1: Read existing state logic**
+- [x] **Step 1: Read existing state logic**
 
 ```bash
 sed -n '120,205p' src/spiresight/ui/widgets/inspect_panel.py
 ```
 The blocks `_update_button_states` and the button-text section of `_retranslate` are what gets moved.
 
-- [ ] **Step 2: Write failing tests**
+- [x] **Step 2: Write failing tests**
 
 `tests/test_inspect_buttons_controller.py`:
 
@@ -423,14 +423,14 @@ def test_retranslate_updates_done_text(qtwidgets_app, locale):
     assert done.text() == "Done"
 ```
 
-- [ ] **Step 3: Run failing tests**
+- [x] **Step 3: Run failing tests**
 
 ```bash
 .venv/bin/pytest tests/test_inspect_buttons_controller.py -q
 ```
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Implement controller**
+- [x] **Step 4: Implement controller**
 
 `src/spiresight/ui/widgets/inspect_controls.py`:
 
@@ -552,14 +552,14 @@ class InspectButtonsController(QObject):
         self.refresh()
 ```
 
-- [ ] **Step 5: Run tests — expect pass**
+- [x] **Step 5: Run tests — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_inspect_buttons_controller.py -q
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/spiresight/ui/widgets/inspect_controls.py tests/test_inspect_buttons_controller.py
@@ -574,14 +574,14 @@ git commit -m "feat(ui): add InspectButtonsController state machine"
 - Modify: `src/spiresight/ui/widgets/inspect_panel.py`
 - Verify: `tests/test_inspect_panel.py` (must keep passing)
 
-- [ ] **Step 1: Confirm existing tests pass before refactor**
+- [x] **Step 1: Confirm existing tests pass before refactor**
 
 ```bash
 .venv/bin/pytest tests/test_inspect_panel.py -q
 ```
 Expected: PASS.
 
-- [ ] **Step 2: Apply refactor**
+- [x] **Step 2: Apply refactor**
 
 Open `src/spiresight/ui/widgets/inspect_panel.py`. Replace the section between the `# buttons` comment (around line 103) and the end of `_retranslate` with the version below. Keep the thumbnail strip block unchanged, and keep these attribute names intact for test compatibility: `_capture_btn`, `_done_btn`, `_clear_btn`, `_session`, `_locale`, `_busy`, `_capability_ok`, `_capability_tooltip`.
 
@@ -641,21 +641,21 @@ Delete `_update_button_states` entirely. Shrink `_retranslate` to only the parts
 
 Delete the `from PySide6.QtWidgets import` line's reference to anything no longer used (likely nothing changes here). Confirm `_refresh_thumbnails` no longer calls `self._update_button_states()` — remove that call if present.
 
-- [ ] **Step 3: Run existing tests — expect pass**
+- [x] **Step 3: Run existing tests — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_inspect_panel.py -q
 ```
 Expected: PASS (same count as before).
 
-- [ ] **Step 4: Run full suite**
+- [x] **Step 4: Run full suite**
 
 ```bash
 .venv/bin/pytest -q
 ```
 Expected: same pass count as the end of Task 1 plus +8 from Task 3.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/spiresight/ui/widgets/inspect_panel.py
@@ -670,7 +670,7 @@ git commit -m "refactor(ui): InspectPanel delegates state to InspectButtonsContr
 - Modify: `src/spiresight/ui/widgets/inspect_controls.py` (append `_CountBadge`)
 - Test: `tests/test_mini_inspect_controls.py` (will exercise badge alongside MiniInspectControls in Task 6)
 
-- [ ] **Step 1: Append `_CountBadge` to `inspect_controls.py`**
+- [x] **Step 1: Append `_CountBadge` to `inspect_controls.py`**
 
 Add imports at top of the file:
 
@@ -730,14 +730,14 @@ class _CountBadge(QWidget):
         painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, str(self._count))
 ```
 
-- [ ] **Step 2: Import-smoke check**
+- [x] **Step 2: Import-smoke check**
 
 ```bash
 .venv/bin/python -c "from spiresight.ui.widgets.inspect_controls import _CountBadge; print(_CountBadge.SIZE)"
 ```
 Expected: `14`.
 
-- [ ] **Step 3: Commit (no standalone tests yet — exercised in Task 6)**
+- [x] **Step 3: Commit (no standalone tests yet — exercised in Task 6)**
 
 ```bash
 git add src/spiresight/ui/widgets/inspect_controls.py
@@ -752,7 +752,7 @@ git commit -m "feat(ui): add _CountBadge overlay for mini-bar Capture button"
 - Modify: `src/spiresight/ui/widgets/inspect_controls.py` (append `MiniInspectControls`)
 - Create: `tests/test_mini_inspect_controls.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/test_mini_inspect_controls.py`:
 
@@ -839,14 +839,14 @@ def test_set_busy_disables_all(qtwidgets_app, locale):
     assert w._done_btn.isEnabled() is False
 ```
 
-- [ ] **Step 2: Run failing tests**
+- [x] **Step 2: Run failing tests**
 
 ```bash
 .venv/bin/pytest tests/test_mini_inspect_controls.py -q
 ```
 Expected: FAIL — `MiniInspectControls` does not exist.
 
-- [ ] **Step 3: Implement widget**
+- [x] **Step 3: Implement widget**
 
 Append at the bottom of `src/spiresight/ui/widgets/inspect_controls.py`:
 
@@ -925,14 +925,14 @@ class MiniInspectControls(QWidget):
 
 > **Important:** the QToolButton text-fallback path means in offscreen tests with no SVG assets, the buttons display text glyphs. That is intentional and matches the spec's icon-fallback note.
 
-- [ ] **Step 4: Run tests — expect pass**
+- [x] **Step 4: Run tests — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_mini_inspect_controls.py -q
 ```
 Expected: PASS (all 5).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/spiresight/ui/widgets/inspect_controls.py tests/test_mini_inspect_controls.py
@@ -947,7 +947,7 @@ git commit -m "feat(ui): add MiniInspectControls (3 buttons + count badge)"
 - Modify: `src/spiresight/ui/widgets/info_bubble.py`
 - Create: `tests/test_info_bubble_resize.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/test_info_bubble_resize.py`:
 
@@ -999,14 +999,14 @@ def test_tail_recentered_on_resize(qtwidgets_app):
     assert b._tail.x() == expected_x
 ```
 
-- [ ] **Step 2: Run failing tests**
+- [x] **Step 2: Run failing tests**
 
 ```bash
 .venv/bin/pytest tests/test_info_bubble_resize.py -q
 ```
 Expected: FAIL — `apply_size` not defined / wrong tail position.
 
-- [ ] **Step 3: Apply changes to `info_bubble.py`**
+- [x] **Step 3: Apply changes to `info_bubble.py`**
 
 Add imports near the top of the file:
 
@@ -1068,14 +1068,14 @@ Remove this line (no longer want a height cap on the inner scroll area — bubbl
         self._scroll.setMaximumHeight(BUBBLE_MAX_HEIGHT)
 ```
 
-- [ ] **Step 4: Run tests — expect pass**
+- [x] **Step 4: Run tests — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_info_bubble_resize.py -q
 ```
 Expected: PASS (all 4).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/spiresight/ui/widgets/info_bubble.py tests/test_info_bubble_resize.py
@@ -1090,7 +1090,7 @@ git commit -m "feat(ui): InfoBubble gains apply_size + dynamic tail recenter"
 - Modify: `src/spiresight/ui/widgets/info_bubble.py`
 - Modify: `tests/test_info_bubble_resize.py`
 
-- [ ] **Step 1: Append failing test**
+- [x] **Step 1: Append failing test**
 
 Add to `tests/test_info_bubble_resize.py`:
 
@@ -1108,14 +1108,14 @@ def test_size_grip_present_and_bottom_right(qtwidgets_app):
     assert b._grip.y() >= b.height() - 32
 ```
 
-- [ ] **Step 2: Run — expect fail**
+- [x] **Step 2: Run — expect fail**
 
 ```bash
 .venv/bin/pytest tests/test_info_bubble_resize.py::test_size_grip_present_and_bottom_right -q
 ```
 Expected: FAIL.
 
-- [ ] **Step 3: Add `QSizeGrip` to `info_bubble.py`**
+- [x] **Step 3: Add `QSizeGrip` to `info_bubble.py`**
 
 Import:
 
@@ -1147,14 +1147,14 @@ And update `resizeEvent`:
         self._reposition_grip()
 ```
 
-- [ ] **Step 4: Run — expect pass**
+- [x] **Step 4: Run — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_info_bubble_resize.py -q
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/spiresight/ui/widgets/info_bubble.py tests/test_info_bubble_resize.py
@@ -1169,7 +1169,7 @@ git commit -m "feat(ui): add QSizeGrip to InfoBubble bottom-right"
 - Modify: `src/spiresight/ui/widgets/info_bubble.py`
 - Modify: `tests/test_info_bubble_resize.py`
 
-- [ ] **Step 1: Append failing tests**
+- [x] **Step 1: Append failing tests**
 
 Add to `tests/test_info_bubble_resize.py`:
 
@@ -1197,14 +1197,14 @@ def test_size_changed_signal_emitted_after_debounce(qtwidgets_app):
     assert received[0] == QSize(520, 300)
 ```
 
-- [ ] **Step 2: Run — expect fail**
+- [x] **Step 2: Run — expect fail**
 
 ```bash
 .venv/bin/pytest tests/test_info_bubble_resize.py::test_size_changed_signal_emitted_after_debounce -q
 ```
 Expected: FAIL — `size_changed` attribute missing.
 
-- [ ] **Step 3: Wire the signal + debounce timer**
+- [x] **Step 3: Wire the signal + debounce timer**
 
 Imports:
 
@@ -1243,14 +1243,14 @@ Extend `resizeEvent`:
         self._size_debounce.start()
 ```
 
-- [ ] **Step 4: Run — expect pass**
+- [x] **Step 4: Run — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_info_bubble_resize.py -q
 ```
 Expected: PASS (all 6).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/spiresight/ui/widgets/info_bubble.py tests/test_info_bubble_resize.py
@@ -1265,7 +1265,7 @@ git commit -m "feat(ui): InfoBubble emits size_changed (300ms debounced)"
 - Modify: `src/spiresight/ui/widgets/info_bubble.py`
 - Modify: `tests/test_info_bubble_resize.py`
 
-- [ ] **Step 1: Append failing tests**
+- [x] **Step 1: Append failing tests**
 
 Add to `tests/test_info_bubble_resize.py`:
 
@@ -1295,14 +1295,14 @@ def test_render_history_with_empty_tuple_is_noop(qtwidgets_app):
     assert b.is_empty() is True
 ```
 
-- [ ] **Step 2: Run — expect fail**
+- [x] **Step 2: Run — expect fail**
 
 ```bash
 .venv/bin/pytest tests/test_info_bubble_resize.py -q -k "is_empty or render_history"
 ```
 Expected: FAIL — methods missing.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Inside `InfoBubble`, add:
 
@@ -1330,7 +1330,7 @@ Inside `InfoBubble`, add:
         self.finalize()
 ```
 
-- [ ] **Step 4: Add `is_empty()` to OutputView if missing**
+- [x] **Step 4: Add `is_empty()` to OutputView if missing**
 
 Check whether `OutputView` already has an `is_empty()`:
 
@@ -1348,14 +1348,14 @@ If missing, add a method that returns True when no markdown text has been append
 
 If the attribute name differs (e.g., `_text`, `_markdown`), use that.
 
-- [ ] **Step 5: Run tests — expect pass**
+- [x] **Step 5: Run tests — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_info_bubble_resize.py -q
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/spiresight/ui/widgets/info_bubble.py src/spiresight/ui/widgets/output_view.py tests/test_info_bubble_resize.py
@@ -1370,7 +1370,7 @@ git commit -m "feat(ui): InfoBubble gains render_history + is_empty"
 - Modify: `src/spiresight/ui/widgets/mini_bar.py`
 - Create: `tests/test_mini_bar_layout.py`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 `tests/test_mini_bar_layout.py`:
 
@@ -1480,14 +1480,14 @@ def test_set_inspect_busy_propagates(qtwidgets_app, loader, locale):
     assert bar._inspect._done_btn.isEnabled() is False
 ```
 
-- [ ] **Step 2: Run — expect fail**
+- [x] **Step 2: Run — expect fail**
 
 ```bash
 .venv/bin/pytest tests/test_mini_bar_layout.py -q
 ```
 Expected: FAIL (TypeError: unexpected kwarg `inspect_session`).
 
-- [ ] **Step 3: Rewrite MiniBar**
+- [x] **Step 3: Rewrite MiniBar**
 
 Replace the entire body of `src/spiresight/ui/widgets/mini_bar.py` with:
 
@@ -1626,21 +1626,21 @@ class MiniBar(QWidget):
         self._drag_offset = None
 ```
 
-- [ ] **Step 4: Run new tests — expect pass**
+- [x] **Step 4: Run new tests — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_mini_bar_layout.py -q
 ```
 Expected: PASS (all 7).
 
-- [ ] **Step 5: Run full suite — expect older `main_window` tests to fail on the constructor**
+- [x] **Step 5: Run full suite — expect older `main_window` tests to fail on the constructor**
 
 ```bash
 .venv/bin/pytest -q
 ```
 The call site in `main_window._toggle_mini_bar` still uses the old signature; any test that triggers it will fail. Note which tests fail (likely none until Task 12). If unrelated tests fail, stop and inspect.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/spiresight/ui/widgets/mini_bar.py tests/test_mini_bar_layout.py
@@ -1654,13 +1654,13 @@ git commit -m "feat(ui): MiniBar gains inspect group + bubble toggle"
 **Files:**
 - Modify: `src/spiresight/ui/windows/main_window.py`
 
-- [ ] **Step 1: Locate `_toggle_mini_bar`**
+- [x] **Step 1: Locate `_toggle_mini_bar`**
 
 ```bash
 grep -n "_toggle_mini_bar\|MiniBar(" src/spiresight/ui/windows/main_window.py
 ```
 
-- [ ] **Step 2: Update construction call**
+- [x] **Step 2: Update construction call**
 
 Find the existing block (around line 281):
 
@@ -1694,7 +1694,7 @@ Replace with:
             self._mini_bar.inspect_clear_requested.connect(self._on_clear_requested)
 ```
 
-- [ ] **Step 3: Add stub handler so Step 2 has a target**
+- [x] **Step 3: Add stub handler so Step 2 has a target**
 
 Add a placeholder method on `MainWindow` (a more complete implementation lands in Task 13):
 
@@ -1708,14 +1708,14 @@ Add a placeholder method on `MainWindow` (a more complete implementation lands i
             self._bubble.hide()
 ```
 
-- [ ] **Step 4: Run suite**
+- [x] **Step 4: Run suite**
 
 ```bash
 .venv/bin/pytest -q
 ```
 Expected: all green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/spiresight/ui/windows/main_window.py
@@ -1730,7 +1730,7 @@ git commit -m "feat(ui): wire MiniBar new signature in MainWindow"
 - Modify: `src/spiresight/ui/windows/main_window.py`
 - Create: `tests/test_main_window_minimode_expand.py`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 `tests/test_main_window_minimode_expand.py` — use the same setup style as other main-window-adjacent tests. If a helper / fixture for MainWindow does not yet exist (check `tests/test_main_window*.py`), instantiate MainWindow with minimal stores and configs from existing test patterns.
 
@@ -1813,13 +1813,13 @@ def test_inspect_capability_pushed_on_minibar_entry(main_window):
 
 > **Note for the implementing engineer:** if the `main_window` fixture cannot be built cleanly because of additional required dependencies (capture, pricing data, etc.), inspect `tests/test_history_tab.py` or any other test that touches MainWindow for the right wiring. If there is no precedent, narrow the test scope: instantiate MainWindow with a stubbed `ScreenCapture` via monkeypatch on the import path.
 
-- [ ] **Step 2: Run — expect fail** (`_on_bubble_size_changed` not implemented, helper missing, etc.)
+- [x] **Step 2: Run — expect fail** (`_on_bubble_size_changed` not implemented, helper missing, etc.)
 
 ```bash
 .venv/bin/pytest tests/test_main_window_minimode_expand.py -q
 ```
 
-- [ ] **Step 3: Add helpers + handlers**
+- [x] **Step 3: Add helpers + handlers**
 
 In `MainWindow`, add the anchor-bubble helper (used in 3 places — extract from existing repetition):
 
@@ -1882,7 +1882,7 @@ Import `QSize` near the top of `main_window.py` if not already present:
 from PySide6.QtCore import QPoint, QSize, Qt
 ```
 
-- [ ] **Step 4: Wire bubble creation + size-restore + size-saved signal**
+- [x] **Step 4: Wire bubble creation + size-restore + size-saved signal**
 
 Inside the same `if self._mini_bar is None:` block in `_toggle_mini_bar`, replace the bubble-creation block:
 
@@ -1924,7 +1924,7 @@ Replace the existing `_refresh_inspect_availability`:
 
 Replace the duplicated anchor calc in `_toggle_mini_bar` (around line 302) and in `_on_action` (around line 456) by calls to `self._anchor_bubble_to_minibar()`.
 
-- [ ] **Step 5: Run tests — expect pass**
+- [x] **Step 5: Run tests — expect pass**
 
 ```bash
 .venv/bin/pytest tests/test_main_window_minimode_expand.py -q
@@ -1932,7 +1932,7 @@ Replace the duplicated anchor calc in `_toggle_mini_bar` (around line 302) and i
 ```
 Expected: all green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/spiresight/ui/windows/main_window.py tests/test_main_window_minimode_expand.py
@@ -1946,13 +1946,13 @@ git commit -m "feat(ui): wire mini-bar bubble toggle + size persistence in MainW
 **Files:**
 - Modify: `src/spiresight/ui/windows/main_window.py`
 
-- [ ] **Step 1: Locate inspect-busy push sites**
+- [x] **Step 1: Locate inspect-busy push sites**
 
 ```bash
 grep -n "set_busy\|_inspect_panel\.set_busy\|InspectWorker" src/spiresight/ui/windows/main_window.py
 ```
 
-- [ ] **Step 2: Mirror busy state to mini-bar**
+- [x] **Step 2: Mirror busy state to mini-bar**
 
 Every existing call of the form `self._inspect_panel.set_busy(True)` (and `False`) gets a sibling:
 
@@ -1972,7 +1972,7 @@ Every existing call of the form `self._inspect_panel.set_busy(True)` (and `False
 
 There are typically two sites: the worker start (in `_on_done_requested`) and the worker finished handler.
 
-- [ ] **Step 3: Append test to verify**
+- [x] **Step 3: Append test to verify**
 
 Add to `tests/test_main_window_minimode_expand.py`:
 
@@ -1985,7 +1985,7 @@ def test_inspect_busy_propagates_to_minibar(main_window):
 
 (This is a sanity assertion; the actual worker-lifecycle path is exercised by manual acceptance step 12.)
 
-- [ ] **Step 4: Run + commit**
+- [x] **Step 4: Run + commit**
 
 ```bash
 .venv/bin/pytest tests/test_main_window_minimode_expand.py -q
@@ -2004,13 +2004,13 @@ git commit -m "feat(ui): mirror inspect busy state to mini-bar"
 **Files:**
 - Modify: `src/spiresight/ui/windows/main_window.py`
 
-- [ ] **Step 1: Locate auto-show sites**
+- [x] **Step 1: Locate auto-show sites**
 
 ```bash
 grep -n "self\._bubble\.show()\|self\._bubble\.reset()" src/spiresight/ui/windows/main_window.py
 ```
 
-- [ ] **Step 2: Add `set_bubble_visible(True)` after each show**
+- [x] **Step 2: Add `set_bubble_visible(True)` after each show**
 
 After each `self._bubble.show()` that runs while in mini-bar mode, append:
 
@@ -2021,7 +2021,7 @@ After each `self._bubble.show()` that runs while in mini-bar mode, append:
 
 There are typically two such sites: in `_on_action` (quick-action path) and in the follow-up dispatch path.
 
-- [ ] **Step 3: Append test**
+- [x] **Step 3: Append test**
 
 Add to `tests/test_main_window_minimode_expand.py`:
 
@@ -2036,7 +2036,7 @@ def test_quick_action_sets_minibar_bubble_visible(main_window):
 
 (The integration with `_on_action` requires a working provider; this assertion validates the synchronous wiring.)
 
-- [ ] **Step 4: Run + commit**
+- [x] **Step 4: Run + commit**
 
 ```bash
 .venv/bin/pytest tests/test_main_window_minimode_expand.py -q
@@ -2055,7 +2055,7 @@ git commit -m "feat(ui): quick-action / follow-up sync mini-bar bubble toggle"
 **Files:**
 - Modify: `src/spiresight/ui/qss/dark_fantasy.qss`
 
-- [ ] **Step 1: Append rules at end of file**
+- [x] **Step 1: Append rules at end of file**
 
 ```css
 /* ── Bubble toggle ────────────────────────────────────────── */
@@ -2105,14 +2105,14 @@ QSizeGrip {
 }
 ```
 
-- [ ] **Step 2: Run full test suite**
+- [x] **Step 2: Run full test suite**
 
 ```bash
 .venv/bin/pytest -q
 ```
 Expected: all green (QSS does not run in offscreen, but loader must still parse it).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/spiresight/ui/qss/dark_fantasy.qss
@@ -2125,25 +2125,25 @@ git commit -m "style(ui): QSS for bubble toggle, mini inspect group, size grip"
 
 **Files:** none
 
-- [ ] **Step 1: Launch the app**
+- [x] **Step 1: Launch the app**
 
 ```bash
 .venv/bin/python -m spiresight
 ```
 
-- [ ] **Step 2: Walk the spec's manual checklist**
+- [x] **Step 2: Walk the spec's manual checklist**
 
 Run each of the 15 manual steps from `docs/superpowers/specs/2026-05-19-minimode-ui-expand-design.md` §8.4. For any failure: capture which step + what happened, file a follow-up task, fix.
 
-- [ ] **Step 3: Sanity-check `QSizeGrip` overlap with send button**
+- [x] **Step 3: Sanity-check `QSizeGrip` overlap with send button**
 
 (Per spec §9 note.) In mini-bar mode, open the bubble, drag the grip to confirm resize works, then confirm clicking the send button (↵) still triggers — no click is stolen by the grip.
 
-- [ ] **Step 4: Verify size persistence by restarting**
+- [x] **Step 4: Verify size persistence by restarting**
 
 Resize bubble, exit app, relaunch, enter mini-bar → quick-action → bubble appears at the saved size.
 
-- [ ] **Step 5: Final commit if any docs/notes updated; otherwise no-op**
+- [x] **Step 5: Final commit if any docs/notes updated; otherwise no-op**
 
 ---
 
