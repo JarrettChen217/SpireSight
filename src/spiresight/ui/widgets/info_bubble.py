@@ -234,6 +234,7 @@ class InfoBubble(QWidget):
         # resizeEvent may not fire for hidden windows; reposition unconditionally.
         self._reposition_tail()
         self._reposition_grip()
+        self._size_debounce.start()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
