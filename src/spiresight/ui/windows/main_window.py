@@ -280,28 +280,46 @@ class MainWindow(QMainWindow):
 
     def _toggle_mini_bar(self) -> None:
         if self._mini_bar is None:
-            self._mini_bar = MiniBar(self._loader, hotkey_hint=self._config.hotkey,
-                                      pinned=self._config.always_on_top)
+            self._mini_bar = MiniBar(
+                self._loader,
+                self._config.hotkey,
+                inspect_session=self._inspect_session,
+                locale=self._ui_locale,
+                pinned=self._config.always_on_top,
+                bubble_visible=False,
+            )
             self._mini_bar.action_clicked.connect(self._on_action)
             self._mini_bar.expand_requested.connect(self._exit_mini_bar)
             self._mini_bar.pin_toggled.connect(self._on_pin_toggled)
             self._mini_bar.moved.connect(self._on_mini_bar_moved)
+            self._mini_bar.bubble_toggle_requested.connect(self._on_minibar_bubble_toggled)
+            self._mini_bar.inspect_capture_requested.connect(self._on_capture_requested)
+            self._mini_bar.inspect_done_requested.connect(self._on_done_requested)
+            self._mini_bar.inspect_clear_requested.connect(self._on_clear_requested)
+
             self._bubble = InfoBubble()
+            self._bubble.apply_size(
+                QSize(self._config.bubble_width, self._config.bubble_height)
+            )
             self._bubble.closed.connect(self._on_bubble_closed)
             self._bubble.cancel_requested.connect(self._on_cancel)
             self._bubble.follow_up_requested.connect(self._dispatch_follow_up)
+            self._bubble.size_changed.connect(self._on_bubble_size_changed)
         elif self._mini_bar.is_pinned != self._config.always_on_top:
             self._mini_bar.set_pinned(self._config.always_on_top)
         self.hide()
         self._mini_bar.show()
 
+        # Push capability state on every entry (provider may have changed)
+        ok, tip = self._capability_status_for_inspect()
+        self._mini_bar.set_inspect_capability(ok, tip)
+
         if self._bubble is not None:
             turns = self._conversation.turns()
             if turns:
+                self._anchor_bubble_to_minibar()
                 self._bubble.show()
-                mb_geo = self._mini_bar.geometry()
-                anchor = QPoint(mb_geo.x() + mb_geo.width() // 2, mb_geo.y() + mb_geo.height())
-                self._bubble.move_anchored(anchor)
+                self._mini_bar.set_bubble_visible(True)
 
         self._config.mini_bar_mode = True
         self._store.save(self._config)
@@ -333,13 +351,36 @@ class MainWindow(QMainWindow):
     # ─── mini-bar / bubble helpers ───────────────────────────────
 
     def _on_mini_bar_moved(self, pos: QPoint) -> None:
-        if self._bubble is not None and self._bubble.isVisible() and self._mini_bar is not None:
-            mb_geo = self._mini_bar.geometry()
-            anchor = QPoint(mb_geo.x() + mb_geo.width() // 2, mb_geo.y() + mb_geo.height())
-            self._bubble.move_anchored(anchor)
+        if self._bubble is not None and self._bubble.isVisible():
+            self._anchor_bubble_to_minibar()
+
+    def _anchor_bubble_to_minibar(self) -> None:
+        if self._bubble is None or self._mini_bar is None:
+            return
+        mb_geo = self._mini_bar.geometry()
+        anchor = QPoint(mb_geo.x() + mb_geo.width() // 2, mb_geo.y() + mb_geo.height())
+        self._bubble.move_anchored(anchor)
 
     def _on_bubble_closed(self) -> None:
-        pass
+        if self._mini_bar is not None:
+            self._mini_bar.set_bubble_visible(False)
+
+    def _on_minibar_bubble_toggled(self, want_visible: bool) -> None:
+        if self._bubble is None:
+            return
+        if want_visible:
+            turns = self._conversation.turns()
+            if self._bubble.is_empty() and turns:
+                self._bubble.render_history(turns)
+            self._anchor_bubble_to_minibar()
+            self._bubble.show()
+        else:
+            self._bubble.hide()
+
+    def _on_bubble_size_changed(self, size: QSize) -> None:
+        self._config.bubble_width  = size.width()
+        self._config.bubble_height = size.height()
+        self._store.save(self._config)
 
     def _compose_input_preview_qa(self, prompt_id: str, custom_text: str) -> str:
         if custom_text:
@@ -451,11 +492,10 @@ class MainWindow(QMainWindow):
             self._bubble.reset()
             self._bubble.set_title(action_label, self._config.active_model)
             self._bubble.set_streaming(True)
+            self._anchor_bubble_to_minibar()
             self._bubble.show()
             if self._mini_bar is not None:
-                mb_geo = self._mini_bar.geometry()
-                anchor = QPoint(mb_geo.x() + mb_geo.width() // 2, mb_geo.y() + mb_geo.height())
-                self._bubble.move_anchored(anchor)
+                self._mini_bar.set_bubble_visible(True)
         else:
             self._tabs.setCurrentIndex(_TAB_CHAT)
             self._chat_tab.reset()
@@ -669,6 +709,8 @@ class MainWindow(QMainWindow):
 
         if is_mini and self._bubble is not None:
             self._bubble.set_streaming(True)
+            if self._mini_bar is not None:
+                self._mini_bar.set_bubble_visible(True)
         else:
             self._tabs.setCurrentIndex(_TAB_CHAT)
             self._render_conversation()
@@ -787,29 +829,32 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(loc.get("main.inspect_failed", error=str(exc)), 8000)
         self._inspect_worker = None
 
-    def _refresh_inspect_availability(self) -> None:
+    def _capability_status_for_inspect(self) -> tuple[bool, str]:
         loc = self._ui_locale
         try:
             provider_cfg = self._config.providers.get(self._config.active_provider)
             if provider_cfg is None:
-                self._inspect_panel.set_capture_enabled(False, loc.get("main.no_provider"))
-                return
+                return False, loc.get("main.no_provider")
             provider = registry.get(self._config.active_provider, provider_cfg)
             model = next(
                 (m for m in provider.list_models() if m.id == self._config.active_model), None
             )
             if model is None:
-                self._inspect_panel.set_capture_enabled(False, loc.get("main.no_model"))
-                return
+                return False, loc.get("main.no_model")
             needed = {Capability.VISION, Capability.JSON_MODE}
             missing = needed - set(model.capabilities)
             if missing:
                 names = ", ".join(sorted(c.value for c in missing))
-                self._inspect_panel.set_capture_enabled(False, loc.get("main.lacks_caps", caps=names))
-            else:
-                self._inspect_panel.set_capture_enabled(True)
+                return False, loc.get("main.lacks_caps", caps=names)
+            return True, ""
         except Exception:  # noqa: BLE001
-            self._inspect_panel.set_capture_enabled(True)
+            return True, ""
+
+    def _refresh_inspect_availability(self) -> None:
+        ok, tip = self._capability_status_for_inspect()
+        self._inspect_panel.set_capture_enabled(ok, tip)
+        if self._mini_bar is not None:
+            self._mini_bar.set_inspect_capability(ok, tip)
 
 
 # ── helpers ──
