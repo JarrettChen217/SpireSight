@@ -104,15 +104,20 @@ class InspectPanel(QWidget):
         button_row = QHBoxLayout()
         self._capture_btn = QPushButton(locale.get("panel.capture"))
         self._capture_btn.setObjectName("primary")
-        self._capture_btn.clicked.connect(self.capture_requested.emit)
         self._done_btn = QPushButton(locale.get("panel.done"))
-        self._done_btn.clicked.connect(self.done_requested.emit)
         self._clear_btn = QPushButton(locale.get("panel.clear"))
-        self._clear_btn.clicked.connect(self.clear_requested.emit)
         button_row.addWidget(self._capture_btn)
         button_row.addWidget(self._done_btn)
         button_row.addWidget(self._clear_btn)
         outer.addLayout(button_row)
+
+        from spiresight.ui.widgets.inspect_controls import InspectButtonsController
+        self._ctrl = InspectButtonsController(
+            session, locale, self._capture_btn, self._done_btn, self._clear_btn, self,
+        )
+        self._ctrl.capture_clicked.connect(self.capture_requested.emit)
+        self._ctrl.done_clicked.connect(self.done_requested.emit)
+        self._ctrl.clear_clicked.connect(self.clear_requested.emit)
 
         session.changed.connect(self._refresh_thumbnails)
         locale.changed.connect(self._retranslate)
@@ -122,11 +127,11 @@ class InspectPanel(QWidget):
     def set_capture_enabled(self, enabled: bool, tooltip: str = "") -> None:
         self._capability_ok = enabled
         self._capability_tooltip = tooltip
-        self._update_button_states()
+        self._ctrl.set_capability(enabled, tooltip)
 
     def set_busy(self, busy: bool) -> None:
         self._busy = busy
-        self._update_button_states()
+        self._ctrl.set_busy(busy)
 
     # ── internals ──
     def _refresh_thumbnails(self) -> None:
@@ -141,7 +146,6 @@ class InspectPanel(QWidget):
         if not frames:
             self._strip_scroll.setFixedHeight(0)
             self._strip_layout.addStretch(1)
-            self._update_button_states()
             return
 
         self._strip_scroll.setFixedHeight(44)
@@ -151,52 +155,6 @@ class InspectPanel(QWidget):
             thumb.remove_clicked.connect(self._session.remove_frame)
             self._strip_layout.addWidget(thumb)
         self._strip_layout.addStretch(1)
-        self._update_button_states()
-
-    def _update_button_states(self) -> None:
-        loc = self._locale
-        count = self._session.count
-        at_cap = count >= InspectSession.MAX_FRAMES
-
-        if self._busy:
-            self._capture_btn.setEnabled(False)
-            self._capture_btn.setToolTip("")
-            self._done_btn.setEnabled(False)
-            self._done_btn.setText(loc.get("panel.done_busy"))
-            self._done_btn.setToolTip("")
-            return
-
-        self._done_btn.setText(loc.get("panel.done"))
-
-        if not self._capability_ok:
-            self._capture_btn.setEnabled(False)
-            self._capture_btn.setToolTip(self._capability_tooltip)
-            self._done_btn.setEnabled(False)
-            self._done_btn.setToolTip(self._capability_tooltip)
-            return
-
-        if at_cap:
-            self._capture_btn.setEnabled(False)
-            self._capture_btn.setToolTip(
-                loc.get("panel.max_frames", max=InspectSession.MAX_FRAMES)
-            )
-        else:
-            self._capture_btn.setEnabled(True)
-            self._capture_btn.setToolTip("")
-
-        if count == 0:
-            self._done_btn.setEnabled(False)
-            self._done_btn.setToolTip(loc.get("panel.no_frames"))
-        else:
-            self._done_btn.setEnabled(True)
-            self._done_btn.setToolTip("")
 
     def _retranslate(self) -> None:
-        loc = self._locale
-        self._capture_btn.setText(loc.get("panel.capture"))
-        self._done_btn.setText(
-            loc.get("panel.done_busy") if self._busy else loc.get("panel.done")
-        )
-        self._clear_btn.setText(loc.get("panel.clear"))
         self._refresh_thumbnails()
-        self._update_button_states()
