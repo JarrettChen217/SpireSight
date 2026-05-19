@@ -53,6 +53,10 @@ python_version = "3.11"
 module = ["pygments", "pygments.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["AppKit", "AppKit.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

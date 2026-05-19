@@ -14,7 +14,7 @@ def apply_dock_icon(icon_path: str | None) -> bool:
         return False
     path = str(Path(icon_path).resolve())
     try:
-        from AppKit import NSApplication, NSImage  # type: ignore[import-untyped]
+        from AppKit import NSApplication, NSImage
     except ImportError:
         log.debug("PyObjC AppKit not installed; Dock icon relies on QIcon(%s)", path)
         return False
