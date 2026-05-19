@@ -67,3 +67,34 @@ def test_app_config_request_timeout_override():
     from spiresight.config.schema import AppConfig
     cfg = AppConfig(request_timeout_seconds=60)
     assert cfg.request_timeout_seconds == 60
+
+
+def test_app_config_defaults_bubble_size():
+    from spiresight.config.schema import AppConfig
+    cfg = AppConfig()
+    assert cfg.bubble_width == 360
+    assert cfg.bubble_height == 280
+
+
+def test_app_config_round_trip_preserves_bubble_size(tmp_path):
+    from spiresight.config.schema import AppConfig
+    from spiresight.config.store import ConfigStore
+
+    store = ConfigStore(tmp_path / "config.json")
+    cfg = AppConfig(bubble_width=500, bubble_height=320)
+    store.save(cfg)
+    loaded = store.load()
+    assert loaded.bubble_width == 500
+    assert loaded.bubble_height == 320
+
+
+def test_app_config_legacy_file_uses_defaults(tmp_path):
+    """A config file written before bubble_width/height existed must still load."""
+    import json
+    from spiresight.config.store import ConfigStore
+
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"hotkey": "ctrl+shift+x"}), encoding="utf-8")
+    cfg = ConfigStore(path).load()
+    assert cfg.bubble_width == 360
+    assert cfg.bubble_height == 280

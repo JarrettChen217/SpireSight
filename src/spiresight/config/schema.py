@@ -38,6 +38,8 @@ class AppConfig(BaseSettings):
     always_on_top: bool = True
     mini_bar_mode: bool = False
     hotkey: str = "<ctrl>+<shift>+s"
+    bubble_width:  int = 360
+    bubble_height: int = 280
     last_used_prompt_id: str | None = None
     include_screenshot_default: bool = True
     request_timeout_seconds: int = 180
