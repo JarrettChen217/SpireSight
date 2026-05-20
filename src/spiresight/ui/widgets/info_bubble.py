@@ -195,8 +195,8 @@ class InfoBubble(QWidget):
         self._streaming = False
         self._apply_send_button_style()
 
-    def append_user_message(self, text: str) -> None:
-        self._transcript.append_user_message(text)
+    def append_user_message(self, text: str, *, image_png: bytes | None = None) -> None:
+        self._transcript.append_user_message(text, image_png=image_png)
 
     def begin_assistant_turn(self) -> None:
         self._transcript.begin_assistant_turn()

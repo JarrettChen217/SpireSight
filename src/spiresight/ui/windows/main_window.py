@@ -279,6 +279,19 @@ class MainWindow(QMainWindow):
         self._set_attach_screenshot(False)
         return True
 
+    def _image_for_user_bubble(
+        self,
+        *,
+        captured: bytes | None,
+        include_screenshot: bool,
+        fresh_session: bool = False,
+    ) -> bytes | None:
+        if captured is not None:
+            return captured
+        if include_screenshot and not fresh_session:
+            return self._conversation.last_screenshot()
+        return None
+
     def _open_settings(self) -> None:
         dlg = SettingsDialog(self._config, self._store, self)
         dlg.models_refreshed.connect(self._on_provider_models_refreshed)
@@ -564,7 +577,16 @@ class MainWindow(QMainWindow):
             self._bubble.reset()
             self._bubble.set_title(action_label, self._config.active_model)
             if custom_text:
-                self._bubble.append_user_message(custom_text)
+                self._bubble.append_user_message(
+                    custom_text, image_png=screenshot_png,
+                )
+            elif screenshot_png is not None:
+                try:
+                    qa = self._loader.get_quick_action(action_id)
+                    label = qa.label
+                except Exception:
+                    label = action_id
+                self._bubble.append_user_message(label, image_png=screenshot_png)
             self._bubble.begin_assistant_turn()
             self._bubble.set_streaming(True)
             self._anchor_bubble_to_minibar()
@@ -575,13 +597,18 @@ class MainWindow(QMainWindow):
             self._tabs.setCurrentIndex(_TAB_CHAT)
             self._chat_tab.reset()
             if custom_text:
-                self._chat_tab.append_user_message(custom_text)
+                self._chat_tab.append_user_message(
+                    custom_text, image_png=screenshot_png,
+                )
             else:
                 try:
                     qa = self._loader.get_quick_action(action_id)
-                    self._chat_tab.append_user_message(qa.label)
+                    label = qa.label
                 except Exception:
-                    self._chat_tab.append_user_message(action_id)
+                    label = action_id
+                self._chat_tab.append_user_message(
+                    label, image_png=screenshot_png,
+                )
             self._chat_tab.begin_assistant_turn()
 
         self._compose.set_streaming(True)
@@ -662,7 +689,9 @@ class MainWindow(QMainWindow):
         self._chat_tab.reset()
         custom = entry.custom_text or ""
         if custom:
-            self._chat_tab.append_user_message(custom)
+            self._chat_tab.append_user_message(
+                custom, image_png=screenshot_png,
+            )
         self._chat_tab.begin_assistant_turn()
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
@@ -822,13 +851,19 @@ class MainWindow(QMainWindow):
 
         self._stream_buffer = []
 
+        bubble_image = self._image_for_user_bubble(
+            captured=screenshot_png,
+            include_screenshot=include_screenshot,
+            fresh_session=fresh_session,
+        )
+
         is_mini = self._config.mini_bar_mode
 
         if is_mini and self._bubble is not None:
             if fresh_session:
                 self._bubble.reset()
                 self._bubble.set_title("Chat", self._config.active_model)
-            self._bubble.append_user_message(text)
+            self._bubble.append_user_message(text, image_png=bubble_image)
             self._bubble.begin_assistant_turn()
             self._bubble.set_streaming(True)
             if self._mini_bar is not None:
@@ -837,7 +872,7 @@ class MainWindow(QMainWindow):
             self._tabs.setCurrentIndex(_TAB_CHAT)
             if fresh_session:
                 self._chat_tab.reset()
-            self._chat_tab.append_user_message(text)
+            self._chat_tab.append_user_message(text, image_png=bubble_image)
             self._chat_tab.begin_assistant_turn()
 
         self._compose.set_streaming(True)
