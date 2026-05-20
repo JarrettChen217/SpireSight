@@ -32,14 +32,24 @@ class PromptPanel(QWidget):
         self._locale = locale
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.setSpacing(4)
+        self._layout.setSpacing(6)
         self._header = QLabel("Quick Actions")
         self._layout.addWidget(self._header)
+        self._layout.addSpacing(6)
 
         self._clear_ctx_chk = QCheckBox()
+        self._clear_ctx_chk.setObjectName("quick-action-clear-context")
         self._clear_ctx_chk.setChecked(clear_context)
         self._clear_ctx_chk.toggled.connect(self.clear_context_toggled.emit)
-        self._layout.addWidget(self._clear_ctx_chk)
+        chk_wrap = QWidget()
+        chk_wrap.setObjectName("quick-action-clear-context-wrap")
+        chk_row = QVBoxLayout(chk_wrap)
+        chk_row.setContentsMargins(0, 2, 0, 10)
+        chk_row.setSpacing(0)
+        chk_row.addWidget(self._clear_ctx_chk)
+        self._layout.addWidget(chk_wrap)
+        self._layout.addSpacing(8)
+        self._prefix_count = self._layout.count()
 
         locale.changed.connect(self._retranslate)
         self._retranslate()
@@ -51,8 +61,8 @@ class PromptPanel(QWidget):
         self._clear_ctx_chk.blockSignals(False)
 
     def rebuild(self) -> None:
-        while self._layout.count() > 2:
-            item = self._layout.takeAt(2)
+        while self._layout.count() > self._prefix_count:
+            item = self._layout.takeAt(self._prefix_count)
             if item is not None:
                 w = item.widget()
                 if w is not None:

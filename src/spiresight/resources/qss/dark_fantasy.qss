@@ -381,19 +381,23 @@ QWidget#prompt-panel QLabel {
     text-transform: uppercase;
     letter-spacing: 1px;
 }
-QWidget#prompt-panel QCheckBox {
+QWidget#quick-action-clear-context-wrap {
+    margin: 0;
+}
+QWidget#prompt-panel QCheckBox#quick-action-clear-context {
     color: #6e7a89;
     font-size: 10px;
-    spacing: 6px;
+    spacing: 8px;
+    padding: 2px 4px;
 }
-QWidget#prompt-panel QCheckBox::indicator {
+QWidget#prompt-panel QCheckBox#quick-action-clear-context::indicator {
     width: 12px;
     height: 12px;
     border: 1px solid #1d2233;
     border-radius: 2px;
     background: #0d1018;
 }
-QWidget#prompt-panel QCheckBox::indicator:checked {
+QWidget#prompt-panel QCheckBox#quick-action-clear-context::indicator:checked {
     background: #d4a54a;
     border-color: #d4a54a;
 }
