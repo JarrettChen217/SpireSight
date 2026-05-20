@@ -94,6 +94,7 @@ class MainWindow(QMainWindow):
         self._last_screenshot_png: bytes | None = None
         self._last_request_qa: QuickActionRequest | None = None
         self._last_follow_up_text: str = ""
+        self._last_follow_up_image_png: bytes | None = None
         self._stream_buffer: list[str] = []
         self._attach_screenshot = config.include_screenshot_default
 
@@ -304,7 +305,7 @@ class MainWindow(QMainWindow):
         return None
 
     def _open_settings(self) -> None:
-        dlg = SettingsDialog(self._config, self._store, self)
+        dlg = SettingsDialog(self._config, self._store, self._ui_locale, self)
         dlg.models_refreshed.connect(self._on_provider_models_refreshed)
         dlg.models_refresh_failed.connect(self._on_provider_models_refresh_failed)
         if dlg.exec():
@@ -846,7 +847,12 @@ class MainWindow(QMainWindow):
             prompt_loader=self._loader,
             provider_factory=registry.make_provider,
             screen_capture=_PrecapturedScreen(screenshot_png) if screenshot_png else self._capture,
-            run_state_store=None,
+            run_state_store=self._run_state_store,
+        )
+
+        snap = runner.snapshot_follow_up(request, history)
+        self._last_follow_up_image_png = (
+            snap.messages[-1].image_png if snap.messages else None
         )
 
         self._stream_buffer = []
@@ -897,7 +903,7 @@ class MainWindow(QMainWindow):
         self._conversation.append(Message(
             role="user",
             text=self._last_follow_up_text,
-            image_png=self._last_screenshot_png,
+            image_png=self._last_follow_up_image_png,
         ))
         self._conversation.append(Message(role="assistant", text=full_markdown))
 
@@ -910,6 +916,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Done.", 3000)
 
         self._last_screenshot_png = None
+        self._last_follow_up_image_png = None
         self._stream_buffer = []
         self._last_follow_up_text = ""
 

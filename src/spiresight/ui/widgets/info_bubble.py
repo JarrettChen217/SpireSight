@@ -221,7 +221,7 @@ class InfoBubble(QWidget):
             )
         if usage is not None:
             parts.append(
-                f'<span style="color:#6e7a89;">{usage.input_tokens} in'
+                f'<span style="color:#6e7a89;">{usage.input_tokens} in · {usage.cached_tokens} cached'
                 f' / {usage.output_tokens} out</span>'
             )
         if parts:

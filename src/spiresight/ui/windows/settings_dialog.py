@@ -6,7 +6,7 @@ import logging
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QLabel,
     QLineEdit, QMessageBox, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
 )
 
@@ -17,10 +17,13 @@ from spiresight.llm.errors import MissingAPIKey, MissingBaseURL
 from spiresight.llm.provider import ProviderOptions
 from spiresight.llm.providers.openai_compat_provider import RELAY_PRESETS
 from spiresight.llm.providers.pixel_api_provider import PIXEL_API_BASE_URL
+from spiresight.prompts.ui_locale import UILocale
 from spiresight.ui.widgets.provider_pane import ProviderPane
 from spiresight.ui.workers.model_refresh_worker import ModelRefreshWorker
 
 _log = logging.getLogger(__name__)
+
+_IMAGE_POLICY_KEYS = ("full", "latest_only", "once_only", "never")
 
 
 def _presets_for(name: str) -> dict[str, str] | None:
@@ -39,11 +42,18 @@ class SettingsDialog(QDialog):
     models_refreshed = Signal(str)              # provider_name
     models_refresh_failed = Signal(str, object) # provider_name, Exception
 
-    def __init__(self, config: AppConfig, store: ConfigStore, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        config: AppConfig,
+        store: ConfigStore,
+        locale: UILocale,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("SpireSight — Settings")
         self._config = config
         self._store = store
+        self._locale = locale
         self._panes: dict[str, ProviderPane] = {}
         self._workers: dict[str, ModelRefreshWorker] = {}
 
@@ -116,41 +126,76 @@ class SettingsDialog(QDialog):
         QMessageBox.warning(self, "Refresh failed", f"{name}: {exc}")
         self.models_refresh_failed.emit(name, exc)
 
-    # ---- General tab (unchanged from spec #1) ----
+    # ---- General tab ----
 
     def _build_general_tab(self) -> QWidget:
         page = QWidget()
         form = QFormLayout(page)
+        loc = self._locale
 
+        self._lang_label = QLabel()
         self._lang = QComboBox()
         self._lang.addItem("English", userData="en")
         self._lang.addItem("中文", userData="zh")
         idx = self._lang.findData(self._config.language)
         self._lang.setCurrentIndex(max(0, idx))
 
+        self._hotkey_label = QLabel()
         self._hotkey = QLineEdit(self._config.hotkey)
         self._hotkey.setPlaceholderText("<ctrl>+<shift>+s")
 
+        self._on_top_label = QLabel()
         self._on_top = QCheckBox()
         self._on_top.setChecked(self._config.always_on_top)
 
+        self._timeout_label = QLabel()
         self._timeout = QSpinBox()
         self._timeout.setRange(30, 600)
         self._timeout.setSingleStep(30)
         self._timeout.setValue(self._config.request_timeout_seconds)
 
+        self._transcript_label = QLabel()
         self._transcript_mode = QComboBox()
-        self._transcript_mode.addItem("Compact", userData="compact")
-        self._transcript_mode.addItem("Expanded", userData="expanded")
+        self._transcript_mode.addItem("", userData="compact")
+        self._transcript_mode.addItem("", userData="expanded")
         idx = self._transcript_mode.findData(self._config.chat_transcript_mode)
         self._transcript_mode.setCurrentIndex(max(0, idx))
 
-        form.addRow("Language", self._lang)
-        form.addRow("Hotkey", self._hotkey)
-        form.addRow("Always on top", self._on_top)
-        form.addRow("Request timeout (seconds)", self._timeout)
-        form.addRow("Chat message layout", self._transcript_mode)
+        self._image_policy_label = QLabel()
+        self._image_policy = QComboBox()
+        for key in _IMAGE_POLICY_KEYS:
+            self._image_policy.addItem("", userData=key)
+        idx = self._image_policy.findData(self._config.image_policy)
+        self._image_policy.setCurrentIndex(max(0, idx))
+        self._image_policy.setToolTip(loc.get("settings.image_policy_tip"))
+
+        self._fill_general_labels()
+
+        form.addRow(self._lang_label, self._lang)
+        form.addRow(self._hotkey_label, self._hotkey)
+        form.addRow(self._on_top_label, self._on_top)
+        form.addRow(self._timeout_label, self._timeout)
+        form.addRow(self._transcript_label, self._transcript_mode)
+        form.addRow(self._image_policy_label, self._image_policy)
         return page
+
+    def _fill_general_labels(self) -> None:
+        loc = self._locale
+        self._lang_label.setText("Language")
+        self._hotkey_label.setText("Hotkey")
+        self._on_top_label.setText("Always on top")
+        self._timeout_label.setText(loc.get("settings.request_timeout_label"))
+        self._transcript_label.setText(loc.get("settings.chat_transcript_mode"))
+        self._transcript_mode.setItemText(
+            0, loc.get("settings.chat_transcript_compact"),
+        )
+        self._transcript_mode.setItemText(
+            1, loc.get("settings.chat_transcript_expanded"),
+        )
+        self._image_policy_label.setText(loc.get("settings.image_policy"))
+        for i, key in enumerate(_IMAGE_POLICY_KEYS):
+            self._image_policy.setItemText(i, loc.get(f"settings.image_policy_{key}"))
+        self._image_policy.setToolTip(loc.get("settings.image_policy_tip"))
 
     # ---- accept / persistence ----
 
@@ -167,4 +212,7 @@ class SettingsDialog(QDialog):
         self._config.always_on_top = self._on_top.isChecked()
         self._config.request_timeout_seconds = self._timeout.value()
         self._config.chat_transcript_mode = self._transcript_mode.currentData()
+        policy = self._image_policy.currentData()
+        if policy in _IMAGE_POLICY_KEYS:
+            self._config.image_policy = policy
         self.accept()

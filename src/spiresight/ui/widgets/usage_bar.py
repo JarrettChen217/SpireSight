@@ -93,6 +93,7 @@ class UsageBar(QWidget):
         self._label.setText(
             f"{self._model_label}  "
             f"↑ {_format_k(totals.input_tokens)}  "
+            f"⚡ {_format_k(totals.cached_tokens)}  "
             f"↓ {_format_k(totals.output_tokens)}  "
             f"{cost_text}"
         )
@@ -107,6 +108,7 @@ class UsageBar(QWidget):
             unpriced = "\n(some calls unpriced)"
         self.setToolTip(
             f"input: {totals.input_tokens:,} tokens\n"
+            f"cached: {totals.cached_tokens:,} tokens\n"
             f"output: {totals.output_tokens:,} tokens\n"
             f"{cost_line}{unpriced}"
         )

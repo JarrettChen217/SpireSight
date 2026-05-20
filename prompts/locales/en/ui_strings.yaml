@@ -90,6 +90,12 @@ settings:
   chat_transcript_mode: "Chat message layout"
   chat_transcript_compact: "Compact blocks (scroll inside each message)"
   chat_transcript_expanded: "Full height (scroll the conversation only)"
+  image_policy: "Follow-up screenshot policy"
+  image_policy_tip: "Controls which turns send PNG data to the API. UI still shows thumbnails for all turns."
+  image_policy_full: "Full history (all past screenshots)"
+  image_policy_latest_only: "Latest only (recommended)"
+  image_policy_once_only: "First turn only"
+  image_policy_never: "Never (text + run state only)"
 
 usage:
   tooltip:

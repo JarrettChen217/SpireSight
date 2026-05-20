@@ -15,7 +15,7 @@ from typing import Any, Final
 from openai import OpenAI, APIConnectionError, APIStatusError, APITimeoutError, RateLimitError as OpenAIRateLimitError
 
 from spiresight.config.schema import ProviderConfig
-from spiresight.core.usage import TokenUsage
+from spiresight.llm.usage_parsing import parse_openai_usage
 from spiresight.llm.capabilities import Capability
 from spiresight.llm.capability_table import infer_capabilities
 from spiresight.llm.errors import (
@@ -140,10 +140,7 @@ class OpenAIProvider:
                         yield StreamChunk(
                             text_delta="",
                             finish_reason=None,
-                            usage=TokenUsage(
-                                input_tokens=int(event.usage.prompt_tokens or 0),
-                                output_tokens=int(event.usage.completion_tokens or 0),
-                            ),
+                            usage=parse_openai_usage(event.usage),
                         )
                     choices = event.choices or []
                     if not choices:

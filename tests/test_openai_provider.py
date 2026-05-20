@@ -24,9 +24,10 @@ class FakeEvent:
 
 
 class FakeUsage:
-    def __init__(self, prompt, completion):
+    def __init__(self, prompt, completion, cached=0):
         self.prompt_tokens = prompt
         self.completion_tokens = completion
+        self.prompt_tokens_details = type('D', (), {'cached_tokens': cached})()
 
 
 class FakeStream:
@@ -172,3 +173,15 @@ def test_list_models_prefers_cached(monkeypatch):
     models = p.list_models()
     assert len(models) == 1
     assert models[0].id == "cached-model"
+
+def test_stream_usage_includes_cached(monkeypatch):
+    from spiresight.core.usage import TokenUsage
+    events = [
+        FakeEvent(choices=[FakeChoice("hi")]),
+        FakeEvent(usage=FakeUsage(10, 5, cached=7)),
+    ]
+    p, _ = _make(monkeypatch, events=events)
+    chunks = list(p.stream(model="gpt-4o", system="s", user_text="hi",
+                                  cancel_event=__import__("threading").Event()))
+    usage_chunks = [c for c in chunks if c.usage is not None]
+    assert usage_chunks[-1].usage == TokenUsage(10, 5, 7)

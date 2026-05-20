@@ -90,6 +90,12 @@ settings:
   chat_transcript_mode: "聊天消息布局"
   chat_transcript_compact: "分块限高（块内滚动）"
   chat_transcript_expanded: "完整展开（仅外层滚动）"
+  image_policy: "追问截图策略"
+  image_policy_tip: "控制哪些轮次向 API 发送 PNG。界面仍会显示各轮缩略图。"
+  image_policy_full: "完整历史（每轮截图都发送）"
+  image_policy_latest_only: "仅最新一张（推荐）"
+  image_policy_once_only: "仅首轮带图"
+  image_policy_never: "从不发图（仅文本与对局状态）"
 
 usage:
   tooltip:
