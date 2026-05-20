@@ -15,10 +15,11 @@ from PySide6.QtWidgets import (
 
 from spiresight.core.messages import Message
 from spiresight.core.usage import TokenUsage
+from spiresight.prompts.ui_locale import UILocale
 from spiresight.ui.widgets.conversation_transcript import ConversationTranscript
+from spiresight.ui.widgets.output_view import TranscriptScrollMode
 
 BUBBLE_WIDTH = 360
-BUBBLE_MAX_HEIGHT = 200
 TAIL_SIZE = 10
 
 
@@ -44,15 +45,24 @@ class _TailWidget(QWidget):
 
 class InfoBubble(QWidget):
     closed = Signal()
-    cancel_requested = Signal()
+    stop_requested = Signal()
+    clear_context_requested = Signal()
     follow_up_requested = Signal(str, bool)   # (text, recapture)
     size_changed = Signal(QSize)
 
-    def __init__(self, parent=None) -> None:
+    def __init__(
+        self,
+        locale: UILocale,
+        *,
+        transcript_mode: TranscriptScrollMode = "compact",
+        assistant_max_height: int = 200,
+        parent=None,
+    ) -> None:
         flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint
         super().__init__(parent, flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         self.setObjectName("info-bubble")
+        self._locale = locale
         self._streaming = False
 
         root = QVBoxLayout(self)
@@ -70,6 +80,10 @@ class InfoBubble(QWidget):
         self._model_label = QLabel()
         self._model_label.setObjectName("bubble-model")
 
+        self._clear_btn = QPushButton()
+        self._clear_btn.setObjectName("bubble-clear")
+        self._clear_btn.clicked.connect(self.clear_context_requested.emit)
+
         close_btn = QPushButton("×")
         close_btn.setObjectName("bubble-close")
         close_btn.setFixedSize(24, 24)
@@ -79,10 +93,14 @@ class InfoBubble(QWidget):
         title_row.addWidget(self._chip)
         title_row.addWidget(self._model_label)
         title_row.addStretch(1)
+        title_row.addWidget(self._clear_btn)
         title_row.addWidget(close_btn)
         root.addWidget(title)
 
-        self._transcript = ConversationTranscript()
+        self._transcript = ConversationTranscript(
+            transcript_mode=transcript_mode,
+            assistant_max_height=assistant_max_height,
+        )
         root.addWidget(self._transcript, stretch=1)
 
         # controls row
@@ -94,14 +112,8 @@ class InfoBubble(QWidget):
         self._cost_label = QLabel("")
         self._cost_label.setTextFormat(Qt.TextFormat.RichText)
 
-        self._cancel_btn = QPushButton("Cancel")
-        self._cancel_btn.setObjectName("bubble-cancel")
-        self._cancel_btn.clicked.connect(self.cancel_requested.emit)
-        self._cancel_btn.hide()
-
         ctrl_row.addWidget(self._cost_label)
         ctrl_row.addStretch(1)
-        ctrl_row.addWidget(self._cancel_btn)
         root.addWidget(controls)
 
         # input row
@@ -121,16 +133,16 @@ class InfoBubble(QWidget):
         self._input = QLineEdit()
         self._input.setObjectName("bubble-input")
         self._input.setPlaceholderText("追问…")
-        self._input.returnPressed.connect(self._on_send)
+        self._input.returnPressed.connect(self._on_send_btn)
 
-        send_btn = QPushButton("↵")
-        send_btn.setObjectName("bubble-send")
-        send_btn.setFixedSize(32, 28)
-        send_btn.clicked.connect(self._on_send)
+        self._send_btn = QPushButton("↵")
+        self._send_btn.setObjectName("bubble-send")
+        self._send_btn.setFixedSize(32, 28)
+        self._send_btn.clicked.connect(self._on_send_btn)
 
         ir.addWidget(self._cam_btn)
         ir.addWidget(self._input, stretch=1)
-        ir.addWidget(send_btn)
+        ir.addWidget(self._send_btn)
         root.addWidget(input_row)
 
         # tail pointer — overlay widget at top-center, pointing up toward mini-bar
@@ -153,17 +165,33 @@ class InfoBubble(QWidget):
             lambda: self.size_changed.emit(self.size())
         )
 
+        locale.changed.connect(self._retranslate)
         self.resize(BUBBLE_WIDTH, 240)
         self._reposition_tail()
         self._reposition_grip()
+        self._retranslate()
+
+    @property
+    def transcript(self) -> ConversationTranscript:
+        return self._transcript
+
+    def set_transcript_mode(
+        self,
+        mode: TranscriptScrollMode,
+        *,
+        assistant_max_height: int | None = None,
+    ) -> None:
+        self._transcript.set_transcript_mode(
+            mode, assistant_max_height=assistant_max_height
+        )
 
     # public API
 
     def reset(self) -> None:
         self._transcript.reset()
         self._cost_label.clear()
-        self._cancel_btn.hide()
         self._streaming = False
+        self._apply_send_button_style()
 
     def append_user_message(self, text: str) -> None:
         self._transcript.append_user_message(text)
@@ -180,10 +208,7 @@ class InfoBubble(QWidget):
 
     def set_streaming(self, active: bool) -> None:
         self._streaming = active
-        if active:
-            self._cancel_btn.show()
-        else:
-            self._cancel_btn.hide()
+        self._apply_send_button_style()
 
     def set_cost(self, cost_usd: float | None, usage: TokenUsage | None) -> None:
         parts: list[str] = []
@@ -208,7 +233,7 @@ class InfoBubble(QWidget):
         return self._transcript.is_empty()
 
     def render_history(self, turns: tuple[Message, ...]) -> None:
-        """Replay conversation when toggling ON with empty bubble."""
+        """Replay conversation from store."""
         if not turns:
             return
         self.reset()
@@ -220,7 +245,6 @@ class InfoBubble(QWidget):
             max(self.minimumHeight(), min(self.maximumHeight(), size.height())),
         )
         self.resize(clamped)
-        # resizeEvent may not fire for hidden windows; reposition unconditionally.
         self._reposition_tail()
         self._reposition_grip()
         self._size_debounce.start()
@@ -243,9 +267,27 @@ class InfoBubble(QWidget):
         y = anchor_pos.y() + TAIL_SIZE
         self.move(x, y)
 
+    def _apply_send_button_style(self) -> None:
+        if self._streaming:
+            self._send_btn.setObjectName("stop")
+            self._send_btn.setText(self._locale.get("compose.stop"))
+        else:
+            self._send_btn.setObjectName("bubble-send")
+            self._send_btn.setText("↵")
+        self._send_btn.style().unpolish(self._send_btn)
+        self._send_btn.style().polish(self._send_btn)
+
+    def _retranslate(self) -> None:
+        self._clear_btn.setText(self._locale.get("chat.clear_context"))
+        self._clear_btn.setToolTip(self._locale.get("chat.clear_context"))
+        self._apply_send_button_style()
+
     # internals
 
-    def _on_send(self) -> None:
+    def _on_send_btn(self) -> None:
+        if self._streaming:
+            self.stop_requested.emit()
+            return
         text = self._input.text().strip()
         if not text:
             return

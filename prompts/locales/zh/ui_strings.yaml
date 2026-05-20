@@ -40,10 +40,16 @@ tab:
   logs: "日志"
   help: "帮助"
 
+chat:
+  clear_context: "清除上下文"
+  cleared: "对话上下文已清除。"
+
 compose:
   placeholder: "可选自定义上下文…"
   send: "发送"
   cancel: "取消"
+  stop: "停止"
+  stopped: "请求已停止。"
   include_screenshot: "附截图"
 
 history:
@@ -77,6 +83,9 @@ logs:
 
 settings:
   request_timeout_label: "请求超时（秒）"
+  chat_transcript_mode: "聊天消息布局"
+  chat_transcript_compact: "分块限高（块内滚动）"
+  chat_transcript_expanded: "完整展开（仅外层滚动）"
 
 usage:
   tooltip:

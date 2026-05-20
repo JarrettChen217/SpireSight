@@ -40,10 +40,16 @@ tab:
   logs: "Logs"
   help: "Help"
 
+chat:
+  clear_context: "Clear context"
+  cleared: "Conversation context cleared."
+
 compose:
   placeholder: "Custom context (optional)…"
   send: "Send"
   cancel: "Cancel"
+  stop: "Stop"
+  stopped: "Request stopped."
   include_screenshot: "Include screenshot"
 
 history:
@@ -77,6 +83,9 @@ logs:
 
 settings:
   request_timeout_label: "Request timeout (seconds)"
+  chat_transcript_mode: "Chat message layout"
+  chat_transcript_compact: "Compact blocks (scroll inside each message)"
+  chat_transcript_expanded: "Full height (scroll the conversation only)"
 
 usage:
   tooltip:

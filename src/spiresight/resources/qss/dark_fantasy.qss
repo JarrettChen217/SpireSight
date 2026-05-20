@@ -124,6 +124,27 @@ QPushButton#primary:disabled {
     border-color: #3a3020;
 }
 
+/* ── Stop Button (red, streaming) ───────────────────────────── */
+
+QPushButton#stop {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #e85d4a, stop:1 #c43d2e);
+    border: 1px solid #d4743a;
+    color: #fff8f5;
+    font-weight: 700;
+    padding: 8px 18px;
+}
+
+QPushButton#stop:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #f06e5a, stop:1 #d44a3a);
+}
+
+QPushButton#stop:pressed {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #c43d2e, stop:1 #a32e22);
+}
+
 /* ── Quick-Action Cards ─────────────────────────────────────── */
 
 QPushButton[role="quick-action"] {
@@ -389,6 +410,24 @@ QLabel#bubble-chip { color: #d4a54a; font-weight: 600; font-size: 10px; }
 QLabel#bubble-model { color: #6e7a89; font-family: monospace; font-size: 10px; }
 QPushButton#bubble-close { color: #6e7a89; border: none; font-size: 14px; }
 QPushButton#bubble-close:hover { color: #d4743a; }
+QPushButton#bubble-clear {
+    border: 1px solid #1d2233;
+    color: #6e7a89;
+    background: transparent;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+}
+QPushButton#bubble-clear:hover { border-color: #3a6080; color: #d5cebf; }
+QPushButton#chat-clear {
+    border: 1px solid #1d2233;
+    color: #6e7a89;
+    background: transparent;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+QPushButton#chat-clear:hover { border-color: #3a6080; color: #d5cebf; }
 QLabel#bubble-user-msg {
     background-color: #10141e;
     border-left: 2px solid #d4a54a;
