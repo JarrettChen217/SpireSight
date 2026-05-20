@@ -40,6 +40,8 @@ class AppConfig(BaseSettings):
     hotkey: str = "<ctrl>+<shift>+s"
     bubble_width:  int = 360
     bubble_height: int = 280
+    chat_transcript_mode: Literal["compact", "expanded"] = "compact"
+    chat_assistant_max_height: int = 200
     last_used_prompt_id: str | None = None
     include_screenshot_default: bool = True
     request_timeout_seconds: int = 180

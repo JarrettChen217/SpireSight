@@ -139,10 +139,17 @@ class SettingsDialog(QDialog):
         self._timeout.setSingleStep(30)
         self._timeout.setValue(self._config.request_timeout_seconds)
 
+        self._transcript_mode = QComboBox()
+        self._transcript_mode.addItem("Compact", userData="compact")
+        self._transcript_mode.addItem("Expanded", userData="expanded")
+        idx = self._transcript_mode.findData(self._config.chat_transcript_mode)
+        self._transcript_mode.setCurrentIndex(max(0, idx))
+
         form.addRow("Language", self._lang)
         form.addRow("Hotkey", self._hotkey)
         form.addRow("Always on top", self._on_top)
         form.addRow("Request timeout (seconds)", self._timeout)
+        form.addRow("Chat message layout", self._transcript_mode)
         return page
 
     # ---- accept / persistence ----
@@ -159,4 +166,5 @@ class SettingsDialog(QDialog):
         self._config.hotkey = self._hotkey.text().strip() or self._config.hotkey
         self._config.always_on_top = self._on_top.isChecked()
         self._config.request_timeout_seconds = self._timeout.value()
+        self._config.chat_transcript_mode = self._transcript_mode.currentData()
         self.accept()

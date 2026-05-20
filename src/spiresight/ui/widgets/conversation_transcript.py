@@ -14,12 +14,21 @@ from PySide6.QtWidgets import (
 )
 
 from spiresight.core.messages import Message
-from spiresight.ui.widgets.output_view import OutputView
+from spiresight.ui.widgets.output_view import OutputView, TranscriptScrollMode
 
 
 class ConversationTranscript(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        transcript_mode: TranscriptScrollMode = "compact",
+        assistant_max_height: int = 200,
+    ) -> None:
         super().__init__(parent)
+        self._transcript_mode = transcript_mode
+        self._assistant_max_height = assistant_max_height
+
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
@@ -37,6 +46,18 @@ class ConversationTranscript(QWidget):
 
         self._active_output: OutputView | None = None
         self._turn_widgets = 0
+
+    def set_transcript_mode(
+        self,
+        mode: TranscriptScrollMode,
+        *,
+        assistant_max_height: int | None = None,
+    ) -> None:
+        self._transcript_mode = mode
+        if assistant_max_height is not None:
+            self._assistant_max_height = assistant_max_height
+        for out in self.findChildren(OutputView):
+            out.set_scroll_mode(mode, max_height=self._assistant_max_height)
 
     def reset(self) -> None:
         self._active_output = None
@@ -71,6 +92,10 @@ class ConversationTranscript(QWidget):
         wrap_layout.setSpacing(0)
 
         out = OutputView()
+        out.set_scroll_mode(
+            self._transcript_mode,
+            max_height=self._assistant_max_height,
+        )
         out.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Minimum,

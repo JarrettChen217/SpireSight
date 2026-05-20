@@ -145,7 +145,12 @@ class MainWindow(QMainWindow):
 
         # tabs
         self._tabs = TabWidget()
-        self._chat_tab = ChatTab()
+        self._chat_tab = ChatTab(
+            self._ui_locale,
+            transcript_mode=self._config.chat_transcript_mode,
+            assistant_max_height=self._config.chat_assistant_max_height,
+        )
+        self._chat_tab.clear_requested.connect(self._on_conversation_clear_requested)
         self._run_state_tab = RunStateTab(self._run_state_store, self._ui_locale)
         self._history_tab = HistoryTab(self._history_store, self._ui_locale)
         self._history_tab.resend_requested.connect(self._on_resend)
@@ -180,7 +185,7 @@ class MainWindow(QMainWindow):
         # compose dock
         self._compose = ComposeDock(self._ui_locale, config.include_screenshot_default)
         self._compose.send_clicked.connect(self._on_compose_send)
-        self._compose.cancel_clicked.connect(self._on_cancel)
+        self._compose.stop_clicked.connect(self._on_stop)
         self._compose.include_screenshot_toggled.connect(self._on_screenshot_toggled)
 
         right = QWidget()
@@ -266,6 +271,7 @@ class MainWindow(QMainWindow):
             self._ui_locale.set_language(self._config.language)
             self._prompt_panel.rebuild()
             self._apply_always_on_top()
+            self._apply_chat_transcript_mode()
             self.show()
 
     def _on_provider_models_refreshed(self, name: str) -> None:
@@ -297,14 +303,10 @@ class MainWindow(QMainWindow):
             self._mini_bar.inspect_done_requested.connect(self._on_done_requested)
             self._mini_bar.inspect_clear_requested.connect(self._on_clear_requested)
 
-            self._bubble = InfoBubble()
+            self._bubble = self._make_info_bubble()
             self._bubble.apply_size(
                 QSize(self._config.bubble_width, self._config.bubble_height)
             )
-            self._bubble.closed.connect(self._on_bubble_closed)
-            self._bubble.cancel_requested.connect(self._on_cancel)
-            self._bubble.follow_up_requested.connect(self._dispatch_follow_up)
-            self._bubble.size_changed.connect(self._on_bubble_size_changed)
         elif self._mini_bar.is_pinned != self._config.always_on_top:
             self._mini_bar.set_pinned(self._config.always_on_top)
         self.hide()
@@ -315,11 +317,7 @@ class MainWindow(QMainWindow):
         self._mini_bar.set_inspect_capability(ok, tip)
 
         if self._bubble is not None:
-            turns = self._conversation.turns()
-            if turns:
-                self._anchor_bubble_to_minibar()
-                self._bubble.show()
-                self._mini_bar.set_bubble_visible(True)
+            self._sync_bubble_from_store()
 
         self._config.mini_bar_mode = True
         self._store.save(self._config)
@@ -369,11 +367,7 @@ class MainWindow(QMainWindow):
         if self._bubble is None:
             return
         if want_visible:
-            turns = self._conversation.turns()
-            if self._bubble.is_empty() and turns:
-                self._bubble.render_history(turns)
-            self._anchor_bubble_to_minibar()
-            self._bubble.show()
+            self._sync_bubble_from_store()
         else:
             self._bubble.hide()
 
@@ -391,9 +385,63 @@ class MainWindow(QMainWindow):
         except Exception:
             return prompt_id
 
+    def _make_info_bubble(self) -> InfoBubble:
+        bubble = InfoBubble(
+            self._ui_locale,
+            transcript_mode=self._config.chat_transcript_mode,
+            assistant_max_height=self._config.chat_assistant_max_height,
+        )
+        bubble.closed.connect(self._on_bubble_closed)
+        bubble.stop_requested.connect(self._on_stop)
+        bubble.clear_context_requested.connect(self._on_conversation_clear_requested)
+        bubble.follow_up_requested.connect(self._dispatch_follow_up)
+        bubble.size_changed.connect(self._on_bubble_size_changed)
+        return bubble
+
+    def _apply_chat_transcript_mode(self) -> None:
+        mode = self._config.chat_transcript_mode
+        max_h = self._config.chat_assistant_max_height
+        self._chat_tab.set_transcript_mode(mode, assistant_max_height=max_h)
+        if self._bubble is not None:
+            self._bubble.set_transcript_mode(mode, assistant_max_height=max_h)
+
+    def _sync_bubble_from_store(self) -> None:
+        if self._bubble is None or self._mini_bar is None:
+            return
+        turns = self._conversation.turns()
+        if turns:
+            self._bubble.render_history(turns)
+            self._anchor_bubble_to_minibar()
+            self._bubble.show()
+            self._mini_bar.set_bubble_visible(True)
+        else:
+            self._bubble.reset()
+            self._bubble.hide()
+            self._mini_bar.set_bubble_visible(False)
+
+    def _clear_conversation_context(self, *, cancel_worker: bool = True) -> None:
+        if cancel_worker and self._worker is not None and self._worker.isRunning():
+            self._on_stop()
+        self._conversation.clear()
+        self._chat_tab.reset()
+        if self._bubble is not None:
+            self._bubble.reset()
+        self._last_request_qa = None
+        self._last_screenshot_png = None
+        self._last_follow_up_text = ""
+        self._stream_buffer = []
+        self._compose.set_streaming(False)
+        self.statusBar().showMessage(
+            self._ui_locale.get("chat.cleared"), 2000
+        )
+
+    def _on_conversation_clear_requested(self) -> None:
+        self._clear_conversation_context()
+
     def _render_conversation(self) -> None:
         turns = self._conversation.turns()
         if not turns:
+            self._chat_tab.reset()
             return
         self._tabs.setCurrentIndex(_TAB_CHAT)
         self._chat_tab.reset()
@@ -439,6 +487,8 @@ class MainWindow(QMainWindow):
         )
 
         self._conversation.clear()
+        if self._bubble is not None:
+            self._bubble.reset()
 
         request = QuickActionRequest(
             prompt_id=action_id,
@@ -515,14 +565,7 @@ class MainWindow(QMainWindow):
             input_preview=input_preview,
             parent=self,
         )
-        self._worker.chunk.connect(self._on_chunk)
-        self._worker.finished_ok.connect(self._on_finished)
-        self._worker.failed.connect(self._on_failed)
-        self._worker.run_started.connect(self._tracker.call_started)
-        self._worker.usage_recorded.connect(self._on_usage_recorded)
-        self._worker.cancelled.connect(self._tracker.call_cancelled)
-        self._worker.request_logged.connect(self._logs_tab.log_request)
-        self._worker.response_logged.connect(self._logs_tab.update_response)
+        self._wire_inference_worker(self._worker, on_finished=self._on_finished)
         self._worker.start()
 
     def _on_chunk(self, text: str) -> None:
@@ -602,19 +645,41 @@ class MainWindow(QMainWindow):
             input_preview=input_preview,
             parent=self,
         )
-        self._worker.chunk.connect(self._on_chunk)
-        self._worker.finished_ok.connect(self._on_finished)
-        self._worker.failed.connect(self._on_failed)
-        self._worker.run_started.connect(self._tracker.call_started)
-        self._worker.usage_recorded.connect(self._on_usage_recorded)
-        self._worker.cancelled.connect(self._tracker.call_cancelled)
-        self._worker.request_logged.connect(self._logs_tab.log_request)
-        self._worker.response_logged.connect(self._logs_tab.update_response)
+        self._wire_inference_worker(self._worker, on_finished=self._on_finished)
         self._worker.start()
 
-    def _on_cancel(self) -> None:
+    def _wire_inference_worker(
+        self,
+        worker: InferenceWorker,
+        *,
+        on_finished,
+    ) -> None:
+        worker.chunk.connect(self._on_chunk)
+        worker.finished_ok.connect(on_finished)
+        worker.failed.connect(self._on_failed)
+        worker.run_started.connect(self._tracker.call_started)
+        worker.usage_recorded.connect(self._on_usage_recorded)
+        worker.cancelled.connect(self._tracker.call_cancelled)
+        worker.cancelled.connect(self._on_inference_cancelled)
+        worker.request_logged.connect(self._logs_tab.log_request)
+        worker.response_logged.connect(self._logs_tab.update_response)
+
+    def _on_stop(self) -> None:
         if self._worker is not None:
             self._worker.cancel()
+
+    def _on_inference_cancelled(self) -> None:
+        self._compose.set_streaming(False)
+        if self._bubble is not None:
+            self._bubble.set_streaming(False)
+        if self._config.mini_bar_mode and self._bubble is not None:
+            self._bubble.finalize()
+        else:
+            self._chat_tab.finalize()
+        self._stream_buffer = []
+        self.statusBar().showMessage(
+            self._ui_locale.get("compose.stopped"), 2000
+        )
 
     def _on_finished(self) -> None:
         self._chat_tab.finalize()
@@ -655,6 +720,10 @@ class MainWindow(QMainWindow):
     def _on_failed(self, exc: Exception) -> None:
         self._tracker.call_failed(str(exc))
         self._chat_tab.finalize()
+        if self._bubble is not None:
+            self._bubble.set_streaming(False)
+            if self._config.mini_bar_mode:
+                self._bubble.finalize()
         self._compose.set_streaming(False)
         msg = str(exc) or exc.__class__.__name__
         self._log(f"{exc.__class__.__name__}: {msg}")
@@ -688,8 +757,7 @@ class MainWindow(QMainWindow):
         fresh_session: bool = False,
     ) -> None:
         if self._worker is not None and self._worker.isRunning():
-            self._worker.cancel()
-            self._worker.wait()
+            return
 
         self._last_follow_up_text = text
 
@@ -754,14 +822,9 @@ class MainWindow(QMainWindow):
             input_preview=input_preview,
             parent=self,
         )
-        self._worker.chunk.connect(self._on_chunk)
-        self._worker.finished_ok.connect(self._on_follow_up_finished)
-        self._worker.failed.connect(self._on_failed)
-        self._worker.run_started.connect(self._tracker.call_started)
-        self._worker.usage_recorded.connect(self._on_usage_recorded)
-        self._worker.cancelled.connect(self._tracker.call_cancelled)
-        self._worker.request_logged.connect(self._logs_tab.log_request)
-        self._worker.response_logged.connect(self._logs_tab.update_response)
+        self._wire_inference_worker(
+            self._worker, on_finished=self._on_follow_up_finished
+        )
         self._worker.start()
 
     def _on_follow_up_finished(self) -> None:

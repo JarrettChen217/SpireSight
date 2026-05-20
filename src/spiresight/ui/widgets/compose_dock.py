@@ -1,9 +1,8 @@
 """Persistent bottom-of-right-pane compose bar.
 
 Always visible regardless of which tab is active. Owns the Custom-text
-input, the Include-screenshot toggle, and the dual-purpose Send/Cancel
-button. The Send button morphs into Cancel while a request is in
-flight (see set_streaming).
+input, the Include-screenshot toggle, and the dual-purpose Send/Stop
+button. The Send button morphs into Stop while a request is in flight.
 """
 from __future__ import annotations
 
@@ -17,18 +16,29 @@ from spiresight.prompts.ui_locale import UILocale
 
 
 class _ComposeTextEdit(QPlainTextEdit):
-    """Enter sends; Shift+Enter inserts newline; Ctrl/Cmd+Enter also sends."""
+    """Enter sends; Shift+Enter inserts newline; Escape stops while streaming."""
 
     submit = Signal()
-    cancel = Signal()
+    stop = Signal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._streaming = False
+
+    def set_streaming(self, streaming: bool) -> None:
+        self._streaming = streaming
 
     def keyPressEvent(self, ev: QKeyEvent) -> None:
         if ev.key() == Qt.Key.Key_Escape:
-            self.cancel.emit()
+            if self._streaming:
+                self.stop.emit()
             return
         if ev.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             if ev.modifiers() & Qt.KeyboardModifier.ShiftModifier:
                 super().keyPressEvent(ev)
+                return
+            if self._streaming:
+                self.stop.emit()
                 return
             self.submit.emit()
             return
@@ -37,7 +47,7 @@ class _ComposeTextEdit(QPlainTextEdit):
 
 class ComposeDock(QWidget):
     send_clicked = Signal(str, bool)            # text, include_screenshot
-    cancel_clicked = Signal()
+    stop_clicked = Signal()
     include_screenshot_toggled = Signal(bool)
 
     def __init__(
@@ -57,8 +67,8 @@ class ComposeDock(QWidget):
         self._text = _ComposeTextEdit()
         self._text.setPlaceholderText(locale.get("compose.placeholder"))
         self._text.setFixedHeight(64)
-        self._text.submit.connect(self._on_send_or_cancel)
-        self._text.cancel.connect(self._on_escape)
+        self._text.submit.connect(self._on_send)
+        self._text.stop.connect(self.stop_clicked.emit)
         outer.addWidget(self._text)
 
         row = QHBoxLayout()
@@ -69,7 +79,7 @@ class ComposeDock(QWidget):
         row.addStretch(1)
         self._send_btn = QPushButton(locale.get("compose.send"))
         self._send_btn.setObjectName("primary")
-        self._send_btn.clicked.connect(self._on_send_or_cancel)
+        self._send_btn.clicked.connect(self._on_send_btn)
         row.addWidget(self._send_btn)
         outer.addLayout(row)
 
@@ -87,15 +97,28 @@ class ComposeDock(QWidget):
 
     def set_streaming(self, streaming: bool) -> None:
         self._streaming = streaming
-        self._send_btn.setText(
-            self._locale.get("compose.cancel") if streaming
-            else self._locale.get("compose.send")
-        )
+        self._text.set_streaming(streaming)
+        if streaming:
+            self._send_btn.setObjectName("stop")
+            self._send_btn.setText(self._locale.get("compose.stop"))
+        else:
+            self._send_btn.setObjectName("primary")
+            self._send_btn.setText(self._locale.get("compose.send"))
+        self._send_btn.style().unpolish(self._send_btn)
+        self._send_btn.style().polish(self._send_btn)
+
+    def is_streaming(self) -> bool:
+        return self._streaming
 
     # ── internals ──
-    def _on_send_or_cancel(self) -> None:
+    def _on_send_btn(self) -> None:
         if self._streaming:
-            self.cancel_clicked.emit()
+            self.stop_clicked.emit()
+            return
+        self._on_send()
+
+    def _on_send(self) -> None:
+        if self._streaming:
             return
         text = self.text()
         if not text:
@@ -103,14 +126,11 @@ class ComposeDock(QWidget):
         self.send_clicked.emit(text, self.include_screenshot())
         self.clear_text()
 
-    def _on_escape(self) -> None:
-        if self._streaming:
-            self.cancel_clicked.emit()
-
     def _retranslate(self) -> None:
         loc = self._locale
         self._text.setPlaceholderText(loc.get("compose.placeholder"))
         self._screenshot_chk.setText(loc.get("compose.include_screenshot"))
-        self._send_btn.setText(
-            loc.get("compose.cancel") if self._streaming else loc.get("compose.send")
-        )
+        if self._streaming:
+            self._send_btn.setText(loc.get("compose.stop"))
+        else:
+            self._send_btn.setText(loc.get("compose.send"))

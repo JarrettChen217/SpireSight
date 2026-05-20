@@ -25,6 +25,8 @@ def locale(tmp_path: Path) -> UILocale:
         "  placeholder: 'type'\n"
         "  send: 'Send'\n"
         "  cancel: 'Cancel'\n"
+        "  stop: 'Stop'\n"
+        "  stopped: 'Stopped'\n"
         "  include_screenshot: 'Screenshot'\n",
         encoding="utf-8",
     )
@@ -52,7 +54,8 @@ def test_set_streaming_swaps_button_label(qtwidgets_app, locale):
     dock = ComposeDock(locale, include_screenshot_default=True)
     assert dock._send_btn.text() == "Send"
     dock.set_streaming(True)
-    assert dock._send_btn.text() == "Cancel"
+    assert dock._send_btn.text() == "Stop"
+    assert dock._send_btn.objectName() == "stop"
     dock.set_streaming(False)
     assert dock._send_btn.text() == "Send"
 
@@ -87,10 +90,22 @@ def test_shift_enter_does_not_submit(qtwidgets_app, locale):
     assert "\n" in dock._text.toPlainText()
 
 
-def test_clicking_send_while_streaming_emits_cancel(qtwidgets_app, locale):
+def test_clicking_send_while_streaming_emits_stop(qtwidgets_app, locale):
     dock = ComposeDock(locale, include_screenshot_default=True)
-    cancelled: list[int] = []
-    dock.cancel_clicked.connect(lambda: cancelled.append(1))
+    stopped: list[int] = []
+    dock.stop_clicked.connect(lambda: stopped.append(1))
     dock.set_streaming(True)
     dock._send_btn.click()
-    assert cancelled == [1]
+    assert stopped == [1]
+
+
+def test_enter_while_streaming_emits_stop(qtwidgets_app, locale):
+    dock = ComposeDock(locale, include_screenshot_default=False)
+    stopped: list[int] = []
+    dock.stop_clicked.connect(lambda: stopped.append(1))
+    dock.set_streaming(True)
+    dock._text.keyPressEvent(
+        QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+    )
+    QApplication.processEvents()
+    assert stopped == [1]
