@@ -47,7 +47,8 @@ class InfoBubble(QWidget):
     closed = Signal()
     stop_requested = Signal()
     clear_context_requested = Signal()
-    follow_up_requested = Signal(str, bool)   # (text, recapture)
+    follow_up_requested = Signal(str, bool)   # (text, recapture) — recapture ignored; see MainWindow
+    attach_screenshot_toggled = Signal(bool)
     size_changed = Signal(QSize)
 
     def __init__(
@@ -127,8 +128,9 @@ class InfoBubble(QWidget):
         self._cam_btn.setText("\U0001f4f7")
         self._cam_btn.setObjectName("bubble-camera")
         self._cam_btn.setCheckable(True)
-        self._cam_btn.setToolTip("Capture new screenshot for this follow-up")
+        self._cam_btn.setToolTip("Attach a screenshot to the next message")
         self._cam_btn.setFixedSize(28, 28)
+        self._cam_btn.toggled.connect(self.attach_screenshot_toggled.emit)
 
         self._input = QLineEdit()
         self._input.setObjectName("bubble-input")
@@ -232,6 +234,11 @@ class InfoBubble(QWidget):
     def is_empty(self) -> bool:
         return self._transcript.is_empty()
 
+    def set_attach_screenshot(self, value: bool) -> None:
+        self._cam_btn.blockSignals(True)
+        self._cam_btn.setChecked(value)
+        self._cam_btn.blockSignals(False)
+
     def render_history(self, turns: tuple[Message, ...]) -> None:
         """Replay conversation from store."""
         if not turns:
@@ -291,7 +298,5 @@ class InfoBubble(QWidget):
         text = self._input.text().strip()
         if not text:
             return
-        recapture = self._cam_btn.isChecked()
         self._input.clear()
-        self._cam_btn.setChecked(False)
-        self.follow_up_requested.emit(text, recapture)
+        self.follow_up_requested.emit(text, self._cam_btn.isChecked())

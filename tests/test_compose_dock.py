@@ -34,7 +34,7 @@ def locale(tmp_path: Path) -> UILocale:
 
 
 def test_send_clicked_emits_with_text(qtwidgets_app, locale):
-    dock = ComposeDock(locale, include_screenshot_default=True)
+    dock = ComposeDock(locale, attach_screenshot=True)
     captured: list[tuple[str, bool]] = []
     dock.send_clicked.connect(lambda t, s: captured.append((t, s)))
     dock._text.setPlainText("hello")
@@ -43,15 +43,23 @@ def test_send_clicked_emits_with_text(qtwidgets_app, locale):
 
 
 def test_include_screenshot_toggle_emits(qtwidgets_app, locale):
-    dock = ComposeDock(locale, include_screenshot_default=True)
+    dock = ComposeDock(locale, attach_screenshot=True)
     seen: list[bool] = []
     dock.include_screenshot_toggled.connect(lambda v: seen.append(v))
     dock._screenshot_chk.click()
     assert seen == [False]
 
 
+def test_set_attach_screenshot_syncs_checkbox(qtwidgets_app, locale):
+    dock = ComposeDock(locale, attach_screenshot=False)
+    dock.set_attach_screenshot(True)
+    assert dock.include_screenshot() is True
+    dock.set_attach_screenshot(False)
+    assert dock.include_screenshot() is False
+
+
 def test_set_streaming_swaps_button_label(qtwidgets_app, locale):
-    dock = ComposeDock(locale, include_screenshot_default=True)
+    dock = ComposeDock(locale, attach_screenshot=True)
     assert dock._send_btn.text() == "Send"
     dock.set_streaming(True)
     assert dock._send_btn.text() == "Stop"
@@ -61,7 +69,7 @@ def test_set_streaming_swaps_button_label(qtwidgets_app, locale):
 
 
 def test_enter_submits_plain_text(qtwidgets_app, locale):
-    dock = ComposeDock(locale, include_screenshot_default=False)
+    dock = ComposeDock(locale, attach_screenshot=False)
     captured: list[tuple[str, bool]] = []
     dock.send_clicked.connect(lambda t, s: captured.append((t, s)))
     dock._text.setPlainText("hello\n")
@@ -74,7 +82,7 @@ def test_enter_submits_plain_text(qtwidgets_app, locale):
 
 
 def test_shift_enter_does_not_submit(qtwidgets_app, locale):
-    dock = ComposeDock(locale, include_screenshot_default=False)
+    dock = ComposeDock(locale, attach_screenshot=False)
     captured: list[tuple[str, bool]] = []
     dock.send_clicked.connect(lambda t, s: captured.append((t, s)))
     dock._text.setPlainText("")
@@ -91,7 +99,7 @@ def test_shift_enter_does_not_submit(qtwidgets_app, locale):
 
 
 def test_clicking_send_while_streaming_emits_stop(qtwidgets_app, locale):
-    dock = ComposeDock(locale, include_screenshot_default=True)
+    dock = ComposeDock(locale, attach_screenshot=True)
     stopped: list[int] = []
     dock.stop_clicked.connect(lambda: stopped.append(1))
     dock.set_streaming(True)
@@ -100,7 +108,7 @@ def test_clicking_send_while_streaming_emits_stop(qtwidgets_app, locale):
 
 
 def test_enter_while_streaming_emits_stop(qtwidgets_app, locale):
-    dock = ComposeDock(locale, include_screenshot_default=False)
+    dock = ComposeDock(locale, attach_screenshot=False)
     stopped: list[int] = []
     dock.stop_clicked.connect(lambda: stopped.append(1))
     dock.set_streaming(True)

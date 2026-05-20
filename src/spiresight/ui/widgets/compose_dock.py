@@ -53,7 +53,7 @@ class ComposeDock(QWidget):
     def __init__(
         self,
         locale: UILocale,
-        include_screenshot_default: bool,
+        attach_screenshot: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -73,7 +73,7 @@ class ComposeDock(QWidget):
 
         row = QHBoxLayout()
         self._screenshot_chk = QCheckBox(locale.get("compose.include_screenshot"))
-        self._screenshot_chk.setChecked(include_screenshot_default)
+        self._screenshot_chk.setChecked(attach_screenshot)
         self._screenshot_chk.toggled.connect(self.include_screenshot_toggled.emit)
         row.addWidget(self._screenshot_chk)
         row.addStretch(1)
@@ -94,6 +94,11 @@ class ComposeDock(QWidget):
 
     def include_screenshot(self) -> bool:
         return self._screenshot_chk.isChecked()
+
+    def set_attach_screenshot(self, value: bool) -> None:
+        self._screenshot_chk.blockSignals(True)
+        self._screenshot_chk.setChecked(value)
+        self._screenshot_chk.blockSignals(False)
 
     def set_streaming(self, streaming: bool) -> None:
         self._streaming = streaming

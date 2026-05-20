@@ -95,6 +95,7 @@ class MainWindow(QMainWindow):
         self._last_request_qa: QuickActionRequest | None = None
         self._last_follow_up_text: str = ""
         self._stream_buffer: list[str] = []
+        self._attach_screenshot = config.include_screenshot_default
 
         self.fire_action_signal.connect(self.fire_last_action)
         self._apply_always_on_top()
@@ -183,10 +184,12 @@ class MainWindow(QMainWindow):
         )
 
         # compose dock
-        self._compose = ComposeDock(self._ui_locale, config.include_screenshot_default)
+        self._compose = ComposeDock(
+            self._ui_locale, attach_screenshot=self._attach_screenshot,
+        )
         self._compose.send_clicked.connect(self._on_compose_send)
         self._compose.stop_clicked.connect(self._on_stop)
-        self._compose.include_screenshot_toggled.connect(self._on_screenshot_toggled)
+        self._compose.include_screenshot_toggled.connect(self._on_attach_screenshot_toggled)
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
@@ -257,9 +260,24 @@ class MainWindow(QMainWindow):
         self._store.save(self._config)
         self._refresh_inspect_availability()
 
-    def _on_screenshot_toggled(self, value: bool) -> None:
-        self._config.include_screenshot_default = value
-        self._store.save(self._config)
+    def _on_attach_screenshot_toggled(self, value: bool) -> None:
+        self._set_attach_screenshot(value)
+
+    def _set_attach_screenshot(self, value: bool, *, persist: bool = True) -> None:
+        self._attach_screenshot = value
+        self._compose.set_attach_screenshot(value)
+        if self._bubble is not None:
+            self._bubble.set_attach_screenshot(value)
+        if persist:
+            self._config.include_screenshot_default = value
+            self._store.save(self._config)
+
+    def _consume_attach_screenshot(self) -> bool:
+        """One-shot: attach screenshot on this send, then turn off everywhere."""
+        if not self._attach_screenshot:
+            return False
+        self._set_attach_screenshot(False)
+        return True
 
     def _open_settings(self) -> None:
         dlg = SettingsDialog(self._config, self._store, self)
@@ -394,7 +412,9 @@ class MainWindow(QMainWindow):
         bubble.closed.connect(self._on_bubble_closed)
         bubble.stop_requested.connect(self._on_stop)
         bubble.clear_context_requested.connect(self._on_conversation_clear_requested)
-        bubble.follow_up_requested.connect(self._dispatch_follow_up)
+        bubble.follow_up_requested.connect(self._on_bubble_follow_up)
+        bubble.attach_screenshot_toggled.connect(self._on_attach_screenshot_toggled)
+        bubble.set_attach_screenshot(self._attach_screenshot)
         bubble.size_changed.connect(self._on_bubble_size_changed)
         return bubble
 
@@ -453,16 +473,21 @@ class MainWindow(QMainWindow):
         if self._config.last_used_prompt_id:
             self._on_action(self._config.last_used_prompt_id)
 
-    def _on_compose_send(self, text: str, include_screenshot: bool) -> None:
+    def _on_compose_send(self, text: str, _include_screenshot: bool) -> None:
+        self._on_follow_up_send(text)
+
+    def _on_bubble_follow_up(self, text: str, _recapture: bool) -> None:
+        self._on_follow_up_send(text)
+
+    def _on_follow_up_send(self, text: str) -> None:
         if not text.strip():
             return
+        recapture = self._consume_attach_screenshot()
         if self._conversation.turns():
-            self._dispatch_follow_up(text, recapture=include_screenshot)
+            self._dispatch_follow_up(text, recapture=recapture)
         else:
             self._dispatch_follow_up(
-                text,
-                recapture=include_screenshot,
-                fresh_session=True,
+                text, recapture=recapture, fresh_session=True,
             )
 
     def _on_action(
@@ -481,10 +506,14 @@ class MainWindow(QMainWindow):
             custom_text_override if custom_text_override is not None
             else self._compose.text()
         )
-        include_screenshot = (
-            include_screenshot_override if include_screenshot_override is not None
-            else self._compose.include_screenshot()
-        )
+        if include_screenshot_override is not None:
+            include_screenshot = include_screenshot_override
+        else:
+            try:
+                qa = self._loader.get_quick_action(action_id)
+                include_screenshot = qa.requires_screenshot
+            except Exception:
+                include_screenshot = True
 
         self._conversation.clear()
         if self._bubble is not None:
