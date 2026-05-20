@@ -67,11 +67,12 @@ class LogsTab(QWidget):
     def log_cost(self, record: CallRecord) -> None:
         ts = record.timestamp.strftime("%H:%M:%S")
         in_tok = str(record.usage.input_tokens) if record.usage_known else "?"
+        cached_tok = str(record.usage.cached_tokens) if record.usage_known else "?"
         out_tok = str(record.usage.output_tokens) if record.usage_known else "?"
         cost = f"~${record.cost_usd:.4f}" if record.cost_usd is not None else "~$—"
         text = (
             f"[{ts}] [cost] {record.model} "
-            f"↑ {in_tok} ↓ {out_tok} {cost} | "
+            f"↑ {in_tok} ⚡{cached_tok} ↓ {out_tok} {cost} | "
             f'Q: "{record.input_preview}" | '
             f'A: "{record.output_preview}"'
         )

@@ -15,6 +15,11 @@ from pathlib import Path
 from typing import Protocol
 
 from spiresight.config.schema import AppConfig, ProviderConfig
+from spiresight.core.message_composer import (
+    apply_image_policy,
+    compose_follow_up_system,
+    resolve_follow_up_image,
+)
 from spiresight.core.messages import Message
 from spiresight.core.request import FollowUpRequest, QuickActionRequest
 from spiresight.core.run_state import RunState
@@ -152,25 +157,25 @@ class InferenceRunner:
         request: FollowUpRequest,
         history: tuple[Message, ...],
     ) -> RequestSnapshot:
-        system = (
+        system_base = (
             _load_freeform_prompt() if not history else _load_guard_prompt()
         )
-        image_png: bytes | None = None
-        if request.recapture:
-            image_png = self._capture.grab_primary()
-        elif request.include_screenshot:
-            for m in reversed(history):
-                if m.role == "user" and m.image_png is not None:
-                    image_png = m.image_png
-                    break
+        capture_primary = self._capture.grab_primary() if request.recapture else None
+        image_png = resolve_follow_up_image(
+            request, history, capture_primary=capture_primary,
+        )
         user_msg = Message(role="user", text=request.user_text, image_png=image_png)
+        messages = apply_image_policy(self._config.image_policy, history, user_msg)
+        run_state = self._store.get() if self._store is not None else None
+        system = compose_follow_up_system(system_base, run_state)
         provider, model = self._get_provider_and_model()
+        has_images = any(m.image_png is not None for m in messages)
         return RequestSnapshot(
             provider=provider.name,
             model=model.id,
             system=system,
-            messages=tuple(history) + (user_msg,),
-            params={"json_mode": False, "has_images": image_png is not None},
+            messages=messages,
+            params={"json_mode": False, "has_images": has_images},
         )
 
     def snapshot_inspect(self, images: list[bytes]) -> RequestSnapshot:

@@ -45,4 +45,5 @@ class AppConfig(BaseSettings):
     last_used_prompt_id: str | None = None
     include_screenshot_default: bool = False
     quick_action_clear_context: bool = True
+    image_policy: Literal["full", "latest_only", "once_only", "never"] = "latest_only"
     request_timeout_seconds: int = 180

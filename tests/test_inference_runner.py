@@ -497,3 +497,36 @@ def test_inspect_rejects_model_without_json_mode(monkeypatch):
     )
     with pytest.raises(MissingCapabilityError):
         runner.inspect(images=[b"\x89PNG"], cancel_event=threading.Event())
+
+def test_run_follow_up_latest_only_strips_history_images():
+    from spiresight.config.schema import AppConfig
+    from spiresight.core.messages import Message
+    from spiresight.core.request import FollowUpRequest
+
+    qa = QuickAction(id="x", label="X", system_prompt_id="s",
+                     user_template="t", requires_screenshot=False,
+                     required_capabilities=[])
+    sp = SystemPrompt(id="s", description="", content="s")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o", frozenset(), 128_000)],
+        chunks=[StreamChunk("ok", "stop")],
+    )
+    cfg = AppConfig(active_provider="openai", active_model="gpt-4o", image_policy="latest_only")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    runner = InferenceRunner(
+        config=cfg, prompt_loader=_FakeLoader(qa, sp),
+        provider_factory=lambda n, p, opts=None: provider,
+        screen_capture=type("C", (), {"grab_primary": lambda self: b"NEW"})(),
+    )
+    old_png = b"OLD_SCREENSHOT"
+    history = (
+        Message(role="user", text="first", image_png=old_png),
+        Message(role="assistant", text="ans"),
+    )
+    req = FollowUpRequest(user_text="follow", include_screenshot=True, recapture=False)
+    list(runner.run_follow_up(req, history, cancel_event=threading.Event()))
+    messages = provider.last_call["messages"]
+    with_image = [m for m in messages if m.image_png is not None]
+    assert len(with_image) == 1
+    assert with_image[0].text == "follow"
+    assert with_image[0].image_png == old_png

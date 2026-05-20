@@ -27,7 +27,7 @@ def _make_record(model: str = "gpt-4o", input_t: int = 100, output_t: int = 200,
 
 def test_initial_state(qtwidgets_app):
     t = UsageTracker()
-    assert t.totals == TokenUsage(0, 0)
+    assert t.totals == TokenUsage(0, 0, 0)
     assert t.total_cost_usd is None
     assert t.last_status == "idle"
     assert t.records == []
@@ -58,7 +58,7 @@ def test_call_completed_ok_updates_totals_and_signals(qtwidgets_app):
     t.call_started("gpt-4o", "q2")
     t.call_completed_ok(_make_record(input_t=50, output_t=75, cost=0.005))
 
-    assert t.totals == TokenUsage(150, 275)
+    assert t.totals == TokenUsage(150, 275, 0)
     assert t.total_cost_usd == pytest.approx(0.015)
     assert len(seen_records) == 2
     assert len(totals_signals) == 2
@@ -71,7 +71,7 @@ def test_call_failed_sets_error_no_record(qtwidgets_app):
     t.call_failed("HTTP 429")
     assert t.last_status == "error"
     assert t.records == []
-    assert t.totals == TokenUsage(0, 0)
+    assert t.totals == TokenUsage(0, 0, 0)
 
 
 def test_call_cancelled_restores_prior_status(qtwidgets_app):
@@ -95,7 +95,7 @@ def test_records_capped_at_200_but_totals_accumulate(qtwidgets_app):
         t.call_started("gpt-4o", "q")
         t.call_completed_ok(_make_record(input_t=1, output_t=1, cost=0.0001))
     assert len(t.records) == 200
-    assert t.totals == TokenUsage(250, 250)
+    assert t.totals == TokenUsage(250, 250, 0)
     assert t.total_cost_usd == pytest.approx(250 * 0.0001)
 
 
@@ -125,3 +125,20 @@ def test_records_are_most_recent_first(qtwidgets_app):
     t.call_completed_ok(_make_record(model="second"))
     assert t.records[0].model == "second"
     assert t.records[1].model == "first"
+
+def test_totals_accumulate_cached(qtwidgets_app):
+    t = UsageTracker()
+    t.call_started("gpt-4o", "q")
+    t.call_completed_ok(_make_record(input_t=100, output_t=50))
+    r = CallRecord(
+        timestamp=datetime(2026, 5, 17, tzinfo=timezone.utc),
+        model="gpt-4o",
+        usage=TokenUsage(80, 40, 60),
+        usage_known=True,
+        cost_usd=0.01,
+        input_preview="q",
+        output_preview="a",
+    )
+    t.call_started("gpt-4o", "q2")
+    t.call_completed_ok(r)
+    assert t.totals == TokenUsage(180, 90, 60)

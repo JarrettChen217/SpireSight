@@ -26,7 +26,7 @@ from openai import (
 )
 
 from spiresight.config.schema import ProviderConfig
-from spiresight.core.usage import TokenUsage
+from spiresight.llm.usage_parsing import parse_openai_usage
 from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import (
     AuthError, MissingAPIKey, NetworkError, RateLimitError, RequestTimeoutError,
@@ -209,19 +209,18 @@ class PixelApiProvider:
                     elif etype == "response.completed":
                         resp = getattr(event, "response", None)
                         usage = getattr(resp, "usage", None) if resp is not None else None
+                        parsed = parse_openai_usage(usage) if usage else None
                         _log.info(
-                            "%s pixel_api.stream completed  in_tokens=%s out_tokens=%s",
+                            "%s pixel_api.stream completed  in_tokens=%s cached=%s out_tokens=%s",
                             _t(),
-                            usage.input_tokens if usage else "?",
-                            usage.output_tokens if usage else "?",
+                            parsed.input_tokens if parsed else "?",
+                            parsed.cached_tokens if parsed else "?",
+                            parsed.output_tokens if parsed else "?",
                         )
                         yield StreamChunk(
                             text_delta="",
                             finish_reason="stop",
-                            usage=TokenUsage(
-                                input_tokens=int(usage.input_tokens or 0),
-                                output_tokens=int(usage.output_tokens or 0),
-                            ) if usage else None,
+                            usage=parsed,
                         )
         except APITimeoutError as exc:
             raise RequestTimeoutError(

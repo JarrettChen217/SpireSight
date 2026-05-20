@@ -22,6 +22,7 @@ _log = logging.getLogger(__name__)
 class TokenUsage:
     input_tokens: int
     output_tokens: int
+    cached_tokens: int = 0
 
 
 @dataclass(frozen=True)
@@ -170,6 +171,7 @@ class UsageTracker(QObject):
         self._records: deque[CallRecord] = deque(maxlen=_MAX_RECORDS)
         self._sum_input = 0
         self._sum_output = 0
+        self._sum_cached = 0
         self._sum_cost_priced = 0.0
         self._has_unpriced = False
         self._status: Status = "idle"
@@ -179,7 +181,7 @@ class UsageTracker(QObject):
 
     @property
     def totals(self) -> TokenUsage:
-        return TokenUsage(self._sum_input, self._sum_output)
+        return TokenUsage(self._sum_input, self._sum_output, self._sum_cached)
 
     @property
     def total_cost_usd(self) -> float | None:
@@ -218,6 +220,7 @@ class UsageTracker(QObject):
         self._records.append(record)
         self._sum_input += record.usage.input_tokens
         self._sum_output += record.usage.output_tokens
+        self._sum_cached += record.usage.cached_tokens
         if record.cost_usd is not None:
             self._sum_cost_priced += record.cost_usd
         else:
