@@ -381,6 +381,22 @@ QWidget#prompt-panel QLabel {
     text-transform: uppercase;
     letter-spacing: 1px;
 }
+QWidget#prompt-panel QCheckBox {
+    color: #6e7a89;
+    font-size: 10px;
+    spacing: 6px;
+}
+QWidget#prompt-panel QCheckBox::indicator {
+    width: 12px;
+    height: 12px;
+    border: 1px solid #1d2233;
+    border-radius: 2px;
+    background: #0d1018;
+}
+QWidget#prompt-panel QCheckBox::indicator:checked {
+    background: #d4a54a;
+    border-color: #d4a54a;
+}
 
 /* ── Divider ────────────────────────────────────────────────── */
 

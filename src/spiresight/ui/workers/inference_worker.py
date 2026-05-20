@@ -84,11 +84,12 @@ class InferenceWorker(QThread):
         runner: InferenceRunner,
         request: QuickActionRequest,
         *,
+        history: tuple[Message, ...] = (),
         model_id: str,
         input_preview: str,
         parent=None,
     ) -> "InferenceWorker":
-        snap = runner.snapshot_quick_action(request)
+        snap = runner.snapshot_quick_action(request, history=history)
 
         def run_fn(cancel: threading.Event) -> Iterator[StreamChunk]:
             yield from runner.run_quick_action(request, cancel_event=cancel)

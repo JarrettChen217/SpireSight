@@ -29,7 +29,7 @@ class _FakeRunner:
     def __init__(self, chunks: list[StreamChunk]) -> None:
         self._chunks = chunks
 
-    def snapshot_quick_action(self, request):
+    def snapshot_quick_action(self, request, *, history=()):
         return _FAKE_SNAP
 
     def run_quick_action(self, request, *, cancel_event: threading.Event) -> Iterator[StreamChunk]:
@@ -133,7 +133,7 @@ def test_worker_continues_iterating_past_finish_reason(qtwidgets_app):
 def test_worker_emits_cancelled_when_cancelled_mid_stream(qtwidgets_app):
     """A canceled run does not append a record."""
     class _SlowRunner:
-        def snapshot_quick_action(self, request):
+        def snapshot_quick_action(self, request, *, history=()):
             return _FAKE_SNAP
 
         def run_quick_action(self, request, *, cancel_event: threading.Event):
@@ -166,7 +166,7 @@ def test_worker_emits_cancelled_when_cancelled_mid_stream(qtwidgets_app):
 
 def test_worker_emits_failed_on_exception(qtwidgets_app):
     class _BoomRunner:
-        def snapshot_quick_action(self, request):
+        def snapshot_quick_action(self, request, *, history=()):
             return _FAKE_SNAP
 
         def run_quick_action(self, request, *, cancel_event: threading.Event):

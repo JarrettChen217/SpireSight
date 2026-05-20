@@ -40,6 +40,10 @@ tab:
   logs: "Logs"
   help: "Help"
 
+quick_action:
+  clear_context: "New session on quick action"
+  clear_context_tip: "When on, each quick action clears chat history. When off, continue the current conversation."
+
 chat:
   clear_context: "Clear context"
   cleared: "Conversation context cleared."

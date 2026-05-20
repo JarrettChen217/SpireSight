@@ -57,6 +57,18 @@ def test_snapshot_quick_action_basic(runner):
     assert snap.messages[0].text == "Help with this"
 
 
+def test_snapshot_quick_action_with_history(runner):
+    hist = (
+        Message(role="user", text="earlier", image_png=None),
+        Message(role="assistant", text="reply", image_png=None),
+    )
+    req = QuickActionRequest(prompt_id="explain", custom_text="now", include_screenshot=False)
+    snap = runner.snapshot_quick_action(req, history=hist)
+    assert len(snap.messages) == 3
+    assert snap.messages[-1].text == "Help with now"
+    assert snap.system == "SYS BASE"
+
+
 def test_snapshot_follow_up_appends_user_message(runner):
     hist = (
         Message(role="user", text="first", image_png=None),
