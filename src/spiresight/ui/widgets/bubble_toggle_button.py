@@ -1,6 +1,8 @@
 """Checkable mini-bar button mirroring the InfoBubble's visibility."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QToolButton
@@ -33,11 +35,10 @@ class BubbleToggleButton(QToolButton):
 
     def _update_icon(self) -> None:
         name = "bubble_filled" if self.isChecked() else "bubble_outline"
-        path = icon_path(name)
-        icon = QIcon(path)
-        if icon.isNull():
+        path = Path(icon_path(name))
+        if not path.is_file():
             self.setIcon(QIcon())
             self.setText("\U0001f4ac")  # 💬 fallback while SVG assets are absent
-        else:
-            self.setText("")
-            self.setIcon(icon)
+            return
+        self.setText("")
+        self.setIcon(QIcon(str(path)))
