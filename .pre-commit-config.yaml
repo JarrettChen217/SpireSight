@@ -13,7 +13,7 @@ repos:
         args: [--fix]
 
   # Mypy and pytest run against the project's own .venv.
-  # Run `pip install -e .[dev]` inside .venv if either hook is "not found".
+  # Run `uv sync --extra dev` if either hook is "not found".
   - repo: local
     hooks:
       - id: mypy

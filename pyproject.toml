@@ -32,6 +32,7 @@ dev = [
   "httpx>=0.27",
   "ruff>=0.5",
   "mypy>=1.10",
+  "pre-commit>=4.0",
   "types-PyYAML>=6.0",
   "types-pynput>=1.7",
   "pyobjc-framework-Cocoa>=10.0; sys_platform == 'darwin'",
@@ -60,3 +61,6 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.uv]
+# Dev tools: [project.optional-dependencies]. Sync with: uv sync --extra dev

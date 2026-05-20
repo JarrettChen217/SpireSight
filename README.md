@@ -3,26 +3,33 @@
 AI visual assistant for *Slay the Spire II*. Captures a screenshot, runs a
 selected prompt through a vision-capable LLM, streams markdown advice back.
 
+## Prerequisites
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) (manages
+Python and dependencies):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh   # macOS / Linux
+# brew install uv
+# winget install --id=astral-sh.uv  # Windows
+```
+
 ## Quick start
 
 ```bash
-python -m venv .venv && source .venv/bin/activate    # macOS / Linux
-# .venv\Scripts\activate                              # Windows
-
-pip install -e ".[dev]"
-python -m spiresight
+uv sync --extra dev
+uv run python -m spiresight
 ```
 
 On first run, open **App → Settings → API Keys** and paste your OpenAI key.
 
 ## Development setup
 
-After cloning, install deps and register the pre-commit hooks:
+After cloning, sync the locked environment and register pre-commit hooks:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-.venv/bin/pre-commit install
+uv sync --extra dev
+uv run pre-commit install
 ```
 
 Every `git commit` will then run **gitleaks** (secret scan), **ruff** (lint +
@@ -32,8 +39,29 @@ commit is recorded.
 To run the checks manually at any time:
 
 ```bash
-.venv/bin/pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
+
+Common commands (all use the project `.venv` created by `uv sync`):
+
+```bash
+uv run pytest -q
+uv run ruff check src tests
+uv run mypy src
+```
+
+### Changing dependencies
+
+Edit version constraints in `pyproject.toml`, then refresh the lockfile and
+commit both files:
+
+```bash
+uv lock
+uv sync --extra dev
+```
+
+CI installs from `uv.lock` with `uv sync --frozen` so everyone gets the same
+resolved versions.
 
 CI also runs [Gitleaks](https://github.com/gitleaks/gitleaks) on every push/PR
 (see `.gitleaks.toml`). Test fixtures and design-doc placeholders are

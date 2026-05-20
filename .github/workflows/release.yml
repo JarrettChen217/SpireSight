@@ -21,16 +21,15 @@ jobs:
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          enable-cache: true
       - run: sudo apt-get install -y libegl1 libgles2
-      - run: pip install -e ".[dev]"
-      - run: ruff check src tests
-      - run: mypy src
-      - run: pytest -q
+      - run: uv sync --extra dev --frozen
+      - run: uv run ruff check src tests
+      - run: uv run mypy src
+      - run: uv run pytest -q
         env:
           QT_QPA_PLATFORM: offscreen
 
@@ -41,11 +40,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.11"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          enable-cache: true
 
       - name: Extract version from tag
         run: |
@@ -59,7 +57,9 @@ jobs:
         run: brew install create-dmg
 
       - name: Install build dependencies
-        run: pip install -e ".[dev]" pyinstaller
+        run: |
+          uv sync --extra dev --frozen
+          uv pip install pyinstaller
 
       - name: Patch pyproject.toml version
         run: |
@@ -67,7 +67,7 @@ jobs:
           grep '^version' pyproject.toml
 
       - name: PyInstaller build
-        run: pyinstaller --noconfirm packaging/spiresight.spec
+        run: uv run pyinstaller --noconfirm packaging/spiresight.spec
 
       - name: Create DMG
         run: |
@@ -97,11 +97,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.11"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          enable-cache: true
 
       - name: Extract version from tag
         shell: pwsh
@@ -113,7 +112,9 @@ jobs:
           Write-Host "Built version: $version (pyproject will be: $pep440)"
 
       - name: Install build dependencies
-        run: pip install -e ".[dev]" pyinstaller
+        run: |
+          uv sync --extra dev --frozen
+          uv pip install pyinstaller
 
       - name: Patch pyproject.toml version
         shell: pwsh
@@ -123,7 +124,7 @@ jobs:
           Select-String -Path pyproject.toml -Pattern '^version'
 
       - name: PyInstaller build
-        run: pyinstaller --noconfirm packaging\spiresight.spec
+        run: uv run pyinstaller --noconfirm packaging\spiresight.spec
 
       - name: Create zip
         shell: pwsh
