@@ -43,5 +43,6 @@ class AppConfig(BaseSettings):
     chat_transcript_mode: Literal["compact", "expanded"] = "compact"
     chat_assistant_max_height: int = 200
     last_used_prompt_id: str | None = None
-    include_screenshot_default: bool = True
+    include_screenshot_default: bool = False
+    quick_action_clear_context: bool = True
     request_timeout_seconds: int = 180

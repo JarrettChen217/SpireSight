@@ -95,6 +95,7 @@ class MainWindow(QMainWindow):
         self._last_request_qa: QuickActionRequest | None = None
         self._last_follow_up_text: str = ""
         self._stream_buffer: list[str] = []
+        self._attach_screenshot = config.include_screenshot_default
 
         self.fire_action_signal.connect(self.fire_last_action)
         self._apply_always_on_top()
@@ -104,8 +105,15 @@ class MainWindow(QMainWindow):
         self._picker.set_active(config.active_provider, config.active_model)
         self._picker.selection_changed.connect(self._on_picker_changed)
 
-        self._prompt_panel = PromptPanel(loader)
+        self._prompt_panel = PromptPanel(
+            loader,
+            self._ui_locale,
+            clear_context=self._config.quick_action_clear_context,
+        )
         self._prompt_panel.action_clicked.connect(self._on_action)
+        self._prompt_panel.clear_context_toggled.connect(
+            self._on_quick_action_clear_context_toggled,
+        )
 
         self._inspect_panel = InspectPanel(self._inspect_session, self._ui_locale)
         self._inspect_panel.capture_requested.connect(self._on_capture_requested)
@@ -183,10 +191,12 @@ class MainWindow(QMainWindow):
         )
 
         # compose dock
-        self._compose = ComposeDock(self._ui_locale, config.include_screenshot_default)
+        self._compose = ComposeDock(
+            self._ui_locale, attach_screenshot=self._attach_screenshot,
+        )
         self._compose.send_clicked.connect(self._on_compose_send)
         self._compose.stop_clicked.connect(self._on_stop)
-        self._compose.include_screenshot_toggled.connect(self._on_screenshot_toggled)
+        self._compose.include_screenshot_toggled.connect(self._on_attach_screenshot_toggled)
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
@@ -257,9 +267,41 @@ class MainWindow(QMainWindow):
         self._store.save(self._config)
         self._refresh_inspect_availability()
 
-    def _on_screenshot_toggled(self, value: bool) -> None:
-        self._config.include_screenshot_default = value
+    def _on_attach_screenshot_toggled(self, value: bool) -> None:
+        self._set_attach_screenshot(value)
+
+    def _set_attach_screenshot(self, value: bool, *, persist: bool = True) -> None:
+        self._attach_screenshot = value
+        self._compose.set_attach_screenshot(value)
+        if self._bubble is not None:
+            self._bubble.set_attach_screenshot(value)
+        if persist:
+            self._config.include_screenshot_default = value
+            self._store.save(self._config)
+
+    def _consume_attach_screenshot(self) -> bool:
+        """One-shot: attach screenshot on this send, then turn off everywhere."""
+        if not self._attach_screenshot:
+            return False
+        self._set_attach_screenshot(False)
+        return True
+
+    def _on_quick_action_clear_context_toggled(self, value: bool) -> None:
+        self._config.quick_action_clear_context = value
         self._store.save(self._config)
+
+    def _image_for_user_bubble(
+        self,
+        *,
+        captured: bytes | None,
+        include_screenshot: bool,
+        fresh_session: bool = False,
+    ) -> bytes | None:
+        if captured is not None:
+            return captured
+        if include_screenshot and not fresh_session:
+            return self._conversation.last_screenshot()
+        return None
 
     def _open_settings(self) -> None:
         dlg = SettingsDialog(self._config, self._store, self)
@@ -394,7 +436,9 @@ class MainWindow(QMainWindow):
         bubble.closed.connect(self._on_bubble_closed)
         bubble.stop_requested.connect(self._on_stop)
         bubble.clear_context_requested.connect(self._on_conversation_clear_requested)
-        bubble.follow_up_requested.connect(self._dispatch_follow_up)
+        bubble.follow_up_requested.connect(self._on_bubble_follow_up)
+        bubble.attach_screenshot_toggled.connect(self._on_attach_screenshot_toggled)
+        bubble.set_attach_screenshot(self._attach_screenshot)
         bubble.size_changed.connect(self._on_bubble_size_changed)
         return bubble
 
@@ -453,16 +497,21 @@ class MainWindow(QMainWindow):
         if self._config.last_used_prompt_id:
             self._on_action(self._config.last_used_prompt_id)
 
-    def _on_compose_send(self, text: str, include_screenshot: bool) -> None:
+    def _on_compose_send(self, text: str, _include_screenshot: bool) -> None:
+        self._on_follow_up_send(text)
+
+    def _on_bubble_follow_up(self, text: str, _recapture: bool) -> None:
+        self._on_follow_up_send(text)
+
+    def _on_follow_up_send(self, text: str) -> None:
         if not text.strip():
             return
+        recapture = self._consume_attach_screenshot()
         if self._conversation.turns():
-            self._dispatch_follow_up(text, recapture=include_screenshot)
+            self._dispatch_follow_up(text, recapture=recapture)
         else:
             self._dispatch_follow_up(
-                text,
-                recapture=include_screenshot,
-                fresh_session=True,
+                text, recapture=recapture, fresh_session=True,
             )
 
     def _on_action(
@@ -481,14 +530,22 @@ class MainWindow(QMainWindow):
             custom_text_override if custom_text_override is not None
             else self._compose.text()
         )
-        include_screenshot = (
-            include_screenshot_override if include_screenshot_override is not None
-            else self._compose.include_screenshot()
-        )
+        if include_screenshot_override is not None:
+            include_screenshot = include_screenshot_override
+        else:
+            try:
+                qa = self._loader.get_quick_action(action_id)
+                include_screenshot = qa.requires_screenshot
+            except Exception:
+                include_screenshot = True
 
-        self._conversation.clear()
-        if self._bubble is not None:
-            self._bubble.reset()
+        clear_ctx = self._config.quick_action_clear_context
+        history: tuple[Message, ...] = () if clear_ctx else self._conversation.turns()
+
+        if clear_ctx:
+            self._conversation.clear()
+            if self._bubble is not None:
+                self._bubble.reset()
 
         request = QuickActionRequest(
             prompt_id=action_id,
@@ -524,18 +581,20 @@ class MainWindow(QMainWindow):
             run_state_store=self._run_state_store,
         )
 
+        try:
+            qa = self._loader.get_quick_action(action_id)
+            action_label = qa.label
+        except Exception:
+            action_label = action_id
+        user_display = custom_text or action_label
+
         is_mini = self._config.mini_bar_mode
 
         if is_mini and self._bubble is not None:
-            try:
-                qa = self._loader.get_quick_action(action_id)
-                action_label = qa.label
-            except Exception:
-                action_label = action_id
-            self._bubble.reset()
             self._bubble.set_title(action_label, self._config.active_model)
-            if custom_text:
-                self._bubble.append_user_message(custom_text)
+            self._bubble.append_user_message(
+                user_display, image_png=screenshot_png,
+            )
             self._bubble.begin_assistant_turn()
             self._bubble.set_streaming(True)
             self._anchor_bubble_to_minibar()
@@ -544,15 +603,11 @@ class MainWindow(QMainWindow):
                 self._mini_bar.set_bubble_visible(True)
         else:
             self._tabs.setCurrentIndex(_TAB_CHAT)
-            self._chat_tab.reset()
-            if custom_text:
-                self._chat_tab.append_user_message(custom_text)
-            else:
-                try:
-                    qa = self._loader.get_quick_action(action_id)
-                    self._chat_tab.append_user_message(qa.label)
-                except Exception:
-                    self._chat_tab.append_user_message(action_id)
+            if clear_ctx:
+                self._chat_tab.reset()
+            self._chat_tab.append_user_message(
+                user_display, image_png=screenshot_png,
+            )
             self._chat_tab.begin_assistant_turn()
 
         self._compose.set_streaming(True)
@@ -561,6 +616,7 @@ class MainWindow(QMainWindow):
         input_preview = self._compose_input_preview_qa(action_id, custom_text)
         self._worker = InferenceWorker.for_quick_action(
             runner, request,
+            history=history,
             model_id=self._config.active_model,
             input_preview=input_preview,
             parent=self,
@@ -633,7 +689,9 @@ class MainWindow(QMainWindow):
         self._chat_tab.reset()
         custom = entry.custom_text or ""
         if custom:
-            self._chat_tab.append_user_message(custom)
+            self._chat_tab.append_user_message(
+                custom, image_png=screenshot_png,
+            )
         self._chat_tab.begin_assistant_turn()
         self._compose.set_streaming(True)
         self.statusBar().showMessage("Streaming…")
@@ -793,13 +851,19 @@ class MainWindow(QMainWindow):
 
         self._stream_buffer = []
 
+        bubble_image = self._image_for_user_bubble(
+            captured=screenshot_png,
+            include_screenshot=include_screenshot,
+            fresh_session=fresh_session,
+        )
+
         is_mini = self._config.mini_bar_mode
 
         if is_mini and self._bubble is not None:
             if fresh_session:
                 self._bubble.reset()
                 self._bubble.set_title("Chat", self._config.active_model)
-            self._bubble.append_user_message(text)
+            self._bubble.append_user_message(text, image_png=bubble_image)
             self._bubble.begin_assistant_turn()
             self._bubble.set_streaming(True)
             if self._mini_bar is not None:
@@ -808,7 +872,7 @@ class MainWindow(QMainWindow):
             self._tabs.setCurrentIndex(_TAB_CHAT)
             if fresh_session:
                 self._chat_tab.reset()
-            self._chat_tab.append_user_message(text)
+            self._chat_tab.append_user_message(text, image_png=bubble_image)
             self._chat_tab.begin_assistant_turn()
 
         self._compose.set_streaming(True)

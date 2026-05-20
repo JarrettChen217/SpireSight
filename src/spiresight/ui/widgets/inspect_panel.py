@@ -21,6 +21,10 @@ from PySide6.QtWidgets import (
 from spiresight.core.inspect_session import InspectSession
 from spiresight.prompts.ui_locale import UILocale
 
+# Thumbnail strip height (matches _Thumbnail). Reserved above the title when
+# empty; moves between title and buttons when frames exist (no layout jump).
+_STRIP_HEIGHT = 44
+
 
 class _Thumbnail(QFrame):
     remove_clicked = Signal(int)
@@ -80,6 +84,13 @@ class InspectPanel(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(6)
+        # Absorb sidebar stretch above the block so title, thumbnails, and
+        # buttons move together when the panel grows or frames are added.
+        outer.addStretch(1)
+
+        self._top_pad = QWidget()
+        self._top_pad.setFixedHeight(_STRIP_HEIGHT)
+        outer.addWidget(self._top_pad)
 
         self._header_label = QLabel("Inspect")
         self._header_label.setProperty("role", "section-header")
@@ -134,6 +145,14 @@ class InspectPanel(QWidget):
         self._ctrl.set_busy(busy)
 
     # ── internals ──
+    def _place_strip_reserve(self, *, show_strip: bool) -> None:
+        if show_strip:
+            self._top_pad.setFixedHeight(0)
+            self._strip_scroll.setFixedHeight(_STRIP_HEIGHT)
+        else:
+            self._top_pad.setFixedHeight(_STRIP_HEIGHT)
+            self._strip_scroll.setFixedHeight(0)
+
     def _refresh_thumbnails(self) -> None:
         while self._strip_layout.count():
             item = self._strip_layout.takeAt(0)
@@ -144,11 +163,11 @@ class InspectPanel(QWidget):
 
         frames = self._session.frames
         if not frames:
-            self._strip_scroll.setFixedHeight(0)
+            self._place_strip_reserve(show_strip=False)
             self._strip_layout.addStretch(1)
             return
 
-        self._strip_scroll.setFixedHeight(44)
+        self._place_strip_reserve(show_strip=True)
         for i, png in enumerate(frames):
             tip = self._locale.get("panel.frame_tooltip", n=i + 1)
             thumb = _Thumbnail(png, i, tip, parent=self._strip_host)

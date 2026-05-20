@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import html
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
@@ -15,6 +16,47 @@ from PySide6.QtWidgets import (
 
 from spiresight.core.messages import Message
 from spiresight.ui.widgets.output_view import OutputView, TranscriptScrollMode
+
+_USER_THUMB_W, _USER_THUMB_H = 64, 36
+
+
+class _UserScreenshotThumb(QLabel):
+    def __init__(self, png: bytes, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("bubble-user-thumb")
+        self.setFixedSize(_USER_THUMB_W, _USER_THUMB_H)
+        pix = QPixmap()
+        pix.loadFromData(png)
+        self.setPixmap(
+            pix.scaled(
+                QSize(_USER_THUMB_W, _USER_THUMB_H),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+
+class _UserMessageBubble(QWidget):
+    def __init__(
+        self,
+        text: str,
+        *,
+        image_png: bytes | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setObjectName("bubble-user-msg")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 6, 10, 6)
+        layout.setSpacing(4)
+        if image_png is not None:
+            layout.addWidget(_UserScreenshotThumb(image_png))
+        label = QLabel(html.escape(text))
+        label.setObjectName("bubble-user-text")
+        label.setWordWrap(True)
+        label.setTextFormat(Qt.TextFormat.PlainText)
+        layout.addWidget(label)
 
 
 class ConversationTranscript(QWidget):
@@ -73,12 +115,9 @@ class ConversationTranscript(QWidget):
     def is_empty(self) -> bool:
         return self._turn_widgets == 0 and self._active_output is None
 
-    def append_user_message(self, text: str) -> None:
-        label = QLabel(html.escape(text))
-        label.setObjectName("bubble-user-msg")
-        label.setWordWrap(True)
-        label.setTextFormat(Qt.TextFormat.PlainText)
-        self._insert_before_stretch(label)
+    def append_user_message(self, text: str, *, image_png: bytes | None = None) -> None:
+        bubble = _UserMessageBubble(text, image_png=image_png)
+        self._insert_before_stretch(bubble)
 
     def begin_assistant_turn(self) -> None:
         if self._active_output is not None:
@@ -133,7 +172,7 @@ class ConversationTranscript(QWidget):
         self.reset()
         for msg in turns:
             if msg.role == "user":
-                self.append_user_message(msg.text)
+                self.append_user_message(msg.text, image_png=msg.image_png)
             else:
                 self.begin_assistant_turn()
                 assert self._active_output is not None

@@ -124,19 +124,26 @@ class InferenceRunner:
 
     # ── snapshot methods ────────────────────────────────────────────────────
 
-    def snapshot_quick_action(self, request: QuickActionRequest) -> RequestSnapshot:
+    def snapshot_quick_action(
+        self,
+        request: QuickActionRequest,
+        *,
+        history: tuple[Message, ...] = (),
+    ) -> RequestSnapshot:
         qa = self._loader.get_quick_action(request.prompt_id)
         sp = self._loader.get_system_prompt(qa.system_prompt_id)
         user_text = qa.user_template.format(custom_text=request.custom_text or "")
         image_png: bytes | None = None
         if qa.requires_screenshot and request.include_screenshot:
             image_png = self._capture.grab_primary()
+        user_msg = Message(role="user", text=user_text, image_png=image_png)
+        messages = (*history, user_msg) if history else (user_msg,)
         provider, model = self._get_provider_and_model()
         return RequestSnapshot(
             provider=provider.name,
             model=model.id,
             system=self._compose_system(sp.content),
-            messages=(Message(role="user", text=user_text, image_png=image_png),),
+            messages=messages,
             params={"json_mode": False, "has_images": image_png is not None},
         )
 

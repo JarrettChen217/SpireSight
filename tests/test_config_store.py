@@ -51,10 +51,10 @@ def test_load_falls_back_when_validation_fails(store, tmp_path):
     assert cfg.language == "en"
 
 
-def test_include_screenshot_default_defaults_to_true():
+def test_include_screenshot_default_defaults_to_false():
     from spiresight.config.schema import AppConfig
     cfg = AppConfig()
-    assert cfg.include_screenshot_default is True
+    assert cfg.include_screenshot_default is False
 
 
 def test_app_config_request_timeout_default():

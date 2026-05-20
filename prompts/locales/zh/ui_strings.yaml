@@ -40,6 +40,10 @@ tab:
   logs: "日志"
   help: "帮助"
 
+quick_action:
+  clear_context: "快捷操作开启新会话"
+  clear_context_tip: "开启时，每次快捷操作会清空对话；关闭则在当前对话上继续。"
+
 chat:
   clear_context: "清除上下文"
   cleared: "对话上下文已清除。"
