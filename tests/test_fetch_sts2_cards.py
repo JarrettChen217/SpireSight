@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json
 
+import httpx
+import pytest
+import respx
+
 
 WIKITEXT = """
 {{Card
@@ -261,3 +265,58 @@ def test_extract_mechanics_dedups_and_preserves_order():
 
     wikitext = "{{KW|Block||2}} {{KW|Weak||2}} {{KW|Block||2}}"
     assert extract_mechanics(wikitext) == ["block", "weak"]
+
+
+API_URL = "https://slaythespire.wiki.gg/api.php"
+
+
+@respx.mock
+def test_fetch_wikitext_returns_wikitext_on_success():
+    from tools.fetch_sts2_cards import _fetch_wikitext
+
+    respx.get(API_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={"parse": {"title": "Slay the Spire 2:Deflect",
+                            "wikitext": {"*": "raw wikitext body"}}},
+        )
+    )
+    with httpx.Client() as client:
+        result = _fetch_wikitext(client, "Slay the Spire 2:Deflect")
+    assert result == "raw wikitext body"
+
+
+@respx.mock
+def test_fetch_wikitext_sends_redirects_param():
+    from tools.fetch_sts2_cards import _fetch_wikitext
+
+    route = respx.get(API_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={"parse": {"wikitext": {"*": "x"}}},
+        )
+    )
+    with httpx.Client() as client:
+        _fetch_wikitext(client, "Slay the Spire 2:Deflect")
+    request = route.calls.last.request
+    assert request.url.params["redirects"] == "1"
+    assert request.url.params["action"] == "parse"
+    assert request.url.params["prop"] == "wikitext"
+    assert request.url.params["format"] == "json"
+    assert request.url.params["page"] == "Slay the Spire 2:Deflect"
+
+
+@respx.mock
+def test_fetch_wikitext_raises_on_api_error():
+    from tools.fetch_sts2_cards import WikiApiError, _fetch_wikitext
+
+    respx.get(API_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={"error": {"code": "missingtitle", "info": "no such page"}},
+        )
+    )
+    with httpx.Client() as client, pytest.raises(WikiApiError) as info:
+        _fetch_wikitext(client, "Slay the Spire 2:Nope")
+    assert info.value.code == "missingtitle"
+    assert "no such page" in info.value.info

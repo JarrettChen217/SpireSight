@@ -18,6 +18,15 @@ from spiresight.knowledge.models import CardKnowledge, normalize_query
 
 API_URL = "https://slaythespire.wiki.gg/api.php"
 SCRIPT_VERSION = "1"
+
+
+class WikiApiError(RuntimeError):
+    """Raised when the MediaWiki API returns an {"error": ...} response."""
+
+    def __init__(self, code: str, info: str) -> None:
+        super().__init__(f"{code}: {info}")
+        self.code = code
+        self.info = info
 CARDS_LIST_PAGE = "Slay the Spire 2:Cards List"
 _NON_CARD_TITLES = {
     "Slay the Spire 2:Block",
@@ -349,8 +358,17 @@ def _fetch_wikitext(client: httpx.Client, title: str) -> str:
         "page": title,
         "prop": "wikitext",
         "format": "json",
+        "redirects": "1",
     }
-    data = client.get(API_URL, params=params).json()
+    response = client.get(API_URL, params=params)
+    response.raise_for_status()
+    data = response.json()
+    if "error" in data:
+        err = data["error"]
+        raise WikiApiError(
+            code=str(err.get("code", "unknown")),
+            info=str(err.get("info", "")),
+        )
     return data["parse"]["wikitext"]["*"]
 
 
