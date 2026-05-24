@@ -22,19 +22,6 @@ STS2_WIKITEXT = """
 * '''Early Access v0.98'''
 """
 
-HTML = """
-<html><body>
-<aside class="portable-infobox">
-  <h2 class="pi-title">Abyssal Wave</h2>
-  <div data-source="character"><div class="pi-data-value">Silent</div></div>
-  <div data-source="rarity"><div class="pi-data-value">Uncommon</div></div>
-  <div data-source="type"><div class="pi-data-value">Skill</div></div>
-  <div data-source="cost"><div class="pi-data-value">1</div></div>
-</aside>
-<p>Apply 6 Poison. Gain 1 Intangible next turn.</p>
-</body></html>
-"""
-
 
 def test_parse_card_wikitext_extracts_upgrade_description():
     from tools.fetch_sts2_cards import parse_card_wikitext
@@ -93,20 +80,6 @@ def test_parse_card_wikitext_does_not_leak_post_lead_mechanics():
     assert "goopy" not in card.mechanics
     assert "Vulnerable" in card.description
 
-
-def test_parse_card_html_fallback_extracts_basic_fields():
-    from tools.fetch_sts2_cards import parse_card_html
-
-    card = parse_card_html(
-        title="Abyssal Wave",
-        html=HTML,
-        source_url="https://example.test/Abyssal_Wave",
-        fetched_at="2026-05-24T00:00:00+00:00",
-    )
-    assert card.name_en == "Abyssal Wave"
-    assert card.rarity == "uncommon"
-    assert card.cost == "1"
-    assert "Poison" in card.description
 
 
 def test_write_outputs_preserves_existing_alias_file(tmp_path):

@@ -13,7 +13,6 @@ from typing import Any
 
 import httpx
 import mwparserfromhell
-from bs4 import BeautifulSoup
 
 from spiresight.knowledge.models import CardKnowledge, normalize_query
 
@@ -226,41 +225,6 @@ def _description_from_lead(wikitext: str) -> str:
     return expand_templates(extract_lead(wikitext))
 
 
-def parse_card_html(
-    *,
-    title: str,
-    html: str,
-    source_url: str,
-    fetched_at: str,
-) -> CardKnowledge:
-    soup = BeautifulSoup(html, "html.parser")
-    name = _first_text(soup, [".pi-title", "h1"]) or title
-    fields = {
-        key: _infobox_value(soup, key)
-        for key in ("character", "rarity", "type", "card_type", "cost")
-    }
-    paragraphs = [
-        p.get_text(" ", strip=True)
-        for p in soup.find_all("p")
-        if p.get_text(" ", strip=True)
-    ]
-    description = paragraphs[0] if paragraphs else ""
-    return CardKnowledge(
-        id=slugify(name),
-        name_en=name,
-        aliases=[],
-        character=_lower_or_none(fields.get("character")),
-        rarity=_lower_or_none(fields.get("rarity")),
-        card_type=_lower_or_none(fields.get("type") or fields.get("card_type")),
-        cost=fields.get("cost") or None,
-        description=description,
-        upgraded_description=None,
-        mechanics=[],
-        source_name="wiki.gg",
-        source_url=source_url,
-        fetched_at=fetched_at,
-    )
-
 
 def write_outputs(output: Path, cards: list[CardKnowledge], *, warnings: list[str]) -> None:
     output = Path(output)
@@ -309,23 +273,13 @@ def fetch_cards() -> tuple[list[CardKnowledge], list[str]]:
         cards: list[CardKnowledge] = []
         for title in titles:
             source_url = f"https://slaythespire.wiki.gg/wiki/{title.replace(' ', '_')}"
-            try:
-                wikitext = _fetch_wikitext(client, title)
-                card = parse_card_wikitext(
-                    title=title,
-                    wikitext=wikitext,
-                    source_url=source_url,
-                    fetched_at=fetched_at,
-                )
-            except Exception as exc:  # noqa: BLE001
-                warnings.append(f"{title}: wikitext failed ({exc}); trying html")
-                html = client.get(source_url).text
-                card = parse_card_html(
-                    title=title,
-                    html=html,
-                    source_url=source_url,
-                    fetched_at=fetched_at,
-                )
+            wikitext = _fetch_wikitext(client, title)
+            card = parse_card_wikitext(
+                title=title,
+                wikitext=wikitext,
+                source_url=source_url,
+                fetched_at=fetched_at,
+            )
             if _looks_like_card(card):
                 cards.append(card)
             else:
@@ -399,23 +353,6 @@ def _fetch_wikitext(client: httpx.Client, title: str) -> str:
     data = client.get(API_URL, params=params).json()
     return data["parse"]["wikitext"]["*"]
 
-
-def _first_text(soup: BeautifulSoup, selectors: list[str]) -> str:
-    for selector in selectors:
-        node = soup.select_one(selector)
-        if node:
-            text = node.get_text(" ", strip=True)
-            if text:
-                return text
-    return ""
-
-
-def _infobox_value(soup: BeautifulSoup, key: str) -> str | None:
-    node = soup.select_one(f'[data-source="{key}"] .pi-data-value')
-    if node is None:
-        return None
-    text = node.get_text(" ", strip=True)
-    return text or None
 
 
 def _lower_or_none(value: str | None) -> str | None:
