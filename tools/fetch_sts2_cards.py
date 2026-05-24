@@ -135,7 +135,8 @@ def extract_mechanics(wikitext: str) -> list[str]:
     parsed = mwparserfromhell.parse(lead)
     out: list[str] = []
     for template in parsed.filter_templates(recursive=True):
-        if str(template.name).strip().casefold() != "kw" or not template.params:
+        name = str(template.name).strip().casefold()
+        if name not in {"kw", "power infobox"} or not template.params:
             continue
         value = clean_text(template.params[0].value).casefold()
         if not value or value in _CHARACTER_VALUES:
@@ -145,13 +146,16 @@ def extract_mechanics(wikitext: str) -> list[str]:
     return out
 
 
+_ENERGY_ICON_RE = re.compile(r"^[a-z]e$")
+
+
 def _extract_cost_before_se_icon(lead: str) -> str | None:
     parsed = mwparserfromhell.parse(lead)
     for template in parsed.filter_templates(recursive=True):
         if str(template.name).strip().casefold() != "icon":
             continue
         params = [clean_text(p.value) for p in template.params]
-        if not params or params[0].casefold() != "se":
+        if not params or not _ENERGY_ICON_RE.match(params[0].casefold()):
             continue
         before_raw = str(lead).split(str(template), 1)[0]
         before = mwparserfromhell.parse(before_raw).strip_code()
@@ -181,7 +185,7 @@ def expand_templates(wikitext: str) -> str:
         params = list(template.params)
         if name in {"icon", "card infobox", "sequel disambiguation"}:
             replacement = ""
-        elif name in {"c", "kw"} and params:
+        elif name in {"c", "kw", "power infobox"} and params:
             replacement = clean_text(params[0].value)
         elif name == "querylink" and len(params) >= 3:
             replacement = clean_text(params[2].value)
@@ -319,10 +323,21 @@ def fetch_cards() -> tuple[list[CardKnowledge], list[str]]:
         for title in titles:
             source_url = f"https://slaythespire.wiki.gg/wiki/{title.replace(' ', '_')}"
             try:
-                wikitext = _with_retry(lambda t=title: _fetch_wikitext(client, t))
+                wikitext = _with_retry(
+                    lambda t=title: _fetch_wikitext(client, t),
+                    retries=4,
+                    base_delay=2.0,
+                )
+            except WikiApiError as exc:
+                if exc.code == "missingtitle":
+                    warnings.append(f"{title}: page not found on wiki, skipped")
+                    continue
+                errors.append(f"{title}: {exc}")
+                continue
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"{title}: {exc}")
                 continue
+            time.sleep(1.0)
             card = parse_card_wikitext(
                 title=title,
                 wikitext=wikitext,

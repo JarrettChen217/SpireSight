@@ -414,6 +414,54 @@ def test_main_exits_nonzero_and_writes_no_output_when_any_card_fails(tmp_path, m
         "parse": {
             "links": [
                 {"ns": 3000, "*": "Slay the Spire 2:Deflect"},
+                {"ns": 3000, "*": "Slay the Spire 2:BadCard"},
+            ]
+        }
+    }
+    deflect_payload = {
+        "parse": {
+            "wikitext": {
+                "*": (
+                    "{{C|Deflect||2}} is a 0 {{Icon|SE|2}} cost "
+                    "{{QueryLink|Cards|rarity:Common&color:Silent|Common|2}} "
+                    "{{QueryLink|Cards|type:Skill&color:Silent|Skill|2}} "
+                    "Card for the {{KW|Silent||2}}. It gives 4 {{KW|Block||2}}."
+                )
+            }
+        }
+    }
+
+    def respond(request):
+        page = request.url.params.get("page")
+        if page == "Slay the Spire 2:Cards List":
+            return httpx.Response(200, json=cards_list_payload)
+        if page == "Slay the Spire 2:Deflect":
+            return httpx.Response(200, json=deflect_payload)
+        if page == "Slay the Spire 2:BadCard":
+            # Non-missingtitle API error → hard fail (not a red-link skip).
+            return httpx.Response(
+                200,
+                json={"error": {"code": "permissiondenied", "info": "blocked"}},
+            )
+        raise AssertionError(f"unexpected page: {page}")
+
+    respx.get(fetch_sts2_cards.API_URL).mock(side_effect=respond)
+
+    output = tmp_path / "sts2_cards"
+    rc = fetch_sts2_cards.main(["--output", str(output)])
+    assert rc == 1
+    assert not (output / "cards.json").exists()
+    assert not (output / "metadata.json").exists()
+
+
+@respx.mock
+def test_main_skips_missingtitle_pages_and_exits_zero(tmp_path):
+    from tools import fetch_sts2_cards
+
+    cards_list_payload = {
+        "parse": {
+            "links": [
+                {"ns": 3000, "*": "Slay the Spire 2:Deflect"},
                 {"ns": 3000, "*": "Slay the Spire 2:NotARealCard"},
             ]
         }
@@ -448,9 +496,10 @@ def test_main_exits_nonzero_and_writes_no_output_when_any_card_fails(tmp_path, m
 
     output = tmp_path / "sts2_cards"
     rc = fetch_sts2_cards.main(["--output", str(output)])
-    assert rc == 1
-    assert not (output / "cards.json").exists()
-    assert not (output / "metadata.json").exists()
+    assert rc == 0
+    cards = json.loads((output / "cards.json").read_text(encoding="utf-8"))
+    assert len(cards) == 1
+    assert cards[0]["name_en"] == "Deflect"
 
 
 @respx.mock
