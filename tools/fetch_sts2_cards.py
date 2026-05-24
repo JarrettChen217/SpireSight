@@ -39,6 +39,39 @@ def clean_text(value: Any) -> str:
     return text.strip()
 
 
+def expand_templates(wikitext: str) -> str:
+    """Rewrite StS2-specific MediaWiki templates to their visible text label.
+
+    {{C|Name||2}}              -> "Name"
+    {{KW|Word||2}}             -> "Word"
+    {{QueryLink|...|label|2}}  -> "label" (param index 2)
+    {{Icon|...}}               -> ""        (dropped)
+    {{Card Infobox|...}}       -> ""        (dropped)
+    {{Sequel Disambiguation}}  -> ""        (dropped)
+    <unknown>                  -> mwparserfromhell strip_code default
+    """
+    parsed = mwparserfromhell.parse(wikitext)
+    for template in list(parsed.filter_templates(recursive=True)):
+        name = str(template.name).strip().casefold()
+        params = list(template.params)
+        if name in {"icon", "card infobox", "sequel disambiguation"}:
+            replacement = ""
+        elif name in {"c", "kw"} and params:
+            replacement = clean_text(params[0].value)
+        elif name == "querylink" and len(params) >= 3:
+            replacement = clean_text(params[2].value)
+        else:
+            replacement = None  # let strip_code handle it
+        if replacement is not None:
+            try:
+                parsed.replace(template, replacement)
+            except ValueError:
+                # template already removed by an outer rewrite — skip
+                continue
+    text = mwparserfromhell.parse(str(parsed)).strip_code()
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def parse_card_wikitext(
     *,
     title: str,

@@ -128,3 +128,23 @@ def test_filter_candidate_titles_keeps_sts2_cards_and_drops_mechanics():
         {"ns": 3000, "*": "Slay the Spire 2:Cards List"},
     ]
     assert filter_candidate_titles(links) == ["Slay the Spire 2:Deflect"]
+
+
+def test_expand_templates_preserves_keyword_labels():
+    from tools.fetch_sts2_cards import expand_templates
+
+    wikitext = (
+        "{{C|Deflect||2}} is a 0 {{Icon|SE|2}} cost "
+        "{{QueryLink|Cards|rarity:Common&color:Silent|Common|2}} "
+        "{{QueryLink|Cards|type:Skill&color:Silent|Skill|2}} "
+        "Card for the {{KW|Silent||2}}. It gives 4 (7 if upgraded) {{KW|Block||2}}."
+    )
+    out = expand_templates(wikitext)
+    assert "Deflect" in out
+    assert "Common" in out
+    assert "Skill" in out
+    assert "Silent" in out
+    assert "Block" in out
+    # Icon templates are dropped to empty
+    assert "SE" not in out
+    assert "Icon" not in out
