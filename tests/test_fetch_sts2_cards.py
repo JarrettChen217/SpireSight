@@ -120,16 +120,28 @@ def test_write_outputs_preserves_existing_alias_file(tmp_path):
     assert alias_path.read_text(encoding="utf-8") == "Deflect:\n- 偏折\n"
 
 
-def test_filter_candidate_titles_keeps_sts2_cards_and_drops_mechanics():
+def test_filter_candidate_titles_keeps_sts2_cards_and_drops_navigation_pages():
     from tools.fetch_sts2_cards import filter_candidate_titles
 
     links = [
+        # Kept: real StS2 card page in the StS2 namespace.
         {"ns": 3000, "*": "Slay the Spire 2:Deflect"},
+        {"ns": 3000, "*": "Slay the Spire 2:Bash"},
+        # Dropped: mechanics/keyword pages (in _NON_CARD_TITLES denylist).
         {"ns": 3000, "*": "Slay the Spire 2:Block"},
-        {"ns": 0, "*": "Deflect"},
+        {"ns": 3000, "*": "Slay the Spire 2:Strength"},
+        {"ns": 3000, "*": "Slay the Spire 2:Vulnerable"},
+        # Dropped: the cards list page itself.
         {"ns": 3000, "*": "Slay the Spire 2:Cards List"},
+        # Dropped: first-game pages in the main namespace.
+        {"ns": 0, "*": "Deflect"},
+        # Dropped: duplicates collapse to one entry.
+        {"ns": 3000, "*": "Slay the Spire 2:Deflect"},
     ]
-    assert filter_candidate_titles(links) == ["Slay the Spire 2:Deflect"]
+    assert filter_candidate_titles(links) == [
+        "Slay the Spire 2:Deflect",
+        "Slay the Spire 2:Bash",
+    ]
 
 
 def test_expand_templates_preserves_keyword_labels():
