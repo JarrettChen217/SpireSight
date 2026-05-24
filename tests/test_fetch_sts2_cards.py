@@ -64,9 +64,34 @@ def test_parse_sts2_sentence_wikitext_extracts_description():
     assert card.name_en == "Deflect"
     assert card.rarity == "common"
     assert card.card_type == "skill"
+    assert card.character == "silent"
     assert card.cost == "0"
-    assert "gives 4" in card.description
+    # Description must now preserve the Block keyword from {{KW|Block||2}}.
+    assert "Block" in card.description
     assert "block" in card.mechanics
+
+
+def test_parse_card_wikitext_does_not_leak_post_lead_mechanics():
+    from tools.fetch_sts2_cards import parse_card_wikitext
+
+    wikitext = (
+        "{{Sequel Disambiguation}}{{Card Infobox|Bash||2}}\n"
+        "{{C|Bash||2}} is a 2 {{Icon|SE|2}} cost "
+        "{{QueryLink|Cards|rarity:Basic&color:Ironclad|Basic|2}} "
+        "{{QueryLink|Cards|type:Attack&color:Ironclad|Attack|2}} "
+        "Card for the {{KW|Ironclad||2}}. It deals 8 damage and applies {{KW|Vulnerable||2}}.\n"
+        "== Update History ==\n"
+        "{{KW|Goopy||2}} {{KW|Enchant||2}} {{KW|Orobas||2}}\n"
+    )
+    card = parse_card_wikitext(
+        title="Slay the Spire 2:Bash",
+        wikitext=wikitext,
+        source_url="https://example.test/Bash",
+        fetched_at="2026-05-24T00:00:00+00:00",
+    )
+    assert card.mechanics == ["vulnerable"]
+    assert "goopy" not in card.mechanics
+    assert "Vulnerable" in card.description
 
 
 def test_parse_card_html_fallback_extracts_basic_fields():

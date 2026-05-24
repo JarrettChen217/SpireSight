@@ -169,42 +169,61 @@ def parse_card_wikitext(
     fetched_at: str,
 ) -> CardKnowledge:
     parsed = mwparserfromhell.parse(wikitext)
-    fields: dict[str, str] = {}
-    for template in parsed.filter_templates(recursive=True):
-        if "card" not in str(template.name).casefold():
-            continue
-        for param in template.params:
-            fields[clean_text(param.name).casefold()] = clean_text(param.value)
-        break
 
-    name = fields.get("name") or _display_title(title)
-    sentence = _extract_card_sentence(wikitext)
-    description = fields.get("description") or fields.get("text") or sentence
-    upgraded = (
-        fields.get("upgrade")
-        or fields.get("upgraded_description")
-        or fields.get("upgraded description")
+    # 1. Look for an explicit {{Card|...}} infobox (used by the simple test fixture).
+    infobox_fields: dict[str, str] = {}
+    for template in parsed.filter_templates(recursive=True):
+        if str(template.name).strip().casefold() == "card":
+            for param in template.params:
+                infobox_fields[clean_text(param.name).casefold()] = clean_text(param.value)
+            break
+
+    # 2. Harvest structured fields from lead-paragraph templates.
+    structured = parse_structured_fields(wikitext)
+
+    # 3. Build the description: prefer explicit infobox description, else the
+    #    template-expanded lead text.
+    name = infobox_fields.get("name") or _display_title(title)
+    description = (
+        infobox_fields.get("description")
+        or infobox_fields.get("text")
+        or _description_from_lead(wikitext)
     )
-    inferred = _infer_fields_from_sentence(sentence)
-    inferred.update(_infer_fields_from_templates(wikitext))
+    upgraded = (
+        infobox_fields.get("upgrade")
+        or infobox_fields.get("upgraded_description")
+        or infobox_fields.get("upgraded description")
+    )
+
+    rarity = infobox_fields.get("rarity") or structured.get("rarity")
+    card_type = (
+        infobox_fields.get("type")
+        or infobox_fields.get("card_type")
+        or structured.get("card_type")
+    )
+    character = infobox_fields.get("character") or structured.get("character")
+    cost = infobox_fields.get("cost") or structured.get("cost")
+
     return CardKnowledge(
         id=slugify(name),
         name_en=name,
         aliases=[],
-        character=_lower_or_none(fields.get("character") or inferred.get("character")),
-        rarity=_lower_or_none(fields.get("rarity") or inferred.get("rarity")),
-        card_type=_lower_or_none(fields.get("type") or fields.get("card_type") or inferred.get("card_type")),
-        cost=fields.get("cost") or inferred.get("cost") or None,
+        character=_lower_or_none(character),
+        rarity=_lower_or_none(rarity),
+        card_type=_lower_or_none(card_type),
+        cost=cost or None,
         description=description,
         upgraded_description=upgraded or None,
-        mechanics=_merge_mechanics(
-            _extract_mechanics(description, upgraded),
-            _extract_mechanics_from_templates(wikitext),
-        ),
+        mechanics=extract_mechanics(wikitext),
         source_name="wiki.gg",
         source_url=source_url,
         fetched_at=fetched_at,
     )
+
+
+def _description_from_lead(wikitext: str) -> str:
+    """Flatten the lead paragraph to clean inline text with template labels preserved."""
+    return expand_templates(extract_lead(wikitext))
 
 
 def parse_card_html(
@@ -236,7 +255,7 @@ def parse_card_html(
         cost=fields.get("cost") or None,
         description=description,
         upgraded_description=None,
-        mechanics=_extract_mechanics(description, None),
+        mechanics=[],
         source_name="wiki.gg",
         source_url=source_url,
         fetched_at=fetched_at,
@@ -406,96 +425,6 @@ def _lower_or_none(value: str | None) -> str | None:
 def _display_title(title: str) -> str:
     return title.split(":", 1)[1] if title.startswith("Slay the Spire 2:") else title
 
-
-def _extract_card_sentence(wikitext: str) -> str:
-    text = clean_text(wikitext)
-    gives_match = re.search(r"(?:It|They|This card) .+?(?:\.\s|$)", text)
-    if gives_match:
-        return gives_match.group(0).strip()
-    match = re.search(r"\b is a[n]? .+?(?:\.\s|$)", text)
-    if not match:
-        return ""
-    sentence = match.group(0).strip()
-    return sentence[1:].strip() if sentence.startswith(" ") else sentence
-
-
-def _infer_fields_from_sentence(sentence: str) -> dict[str, str]:
-    out: dict[str, str] = {}
-    cost_match = re.search(r"is a[n]? ([Xx0-9]+) .*? cost", sentence)
-    if cost_match:
-        out["cost"] = cost_match.group(1)
-    rarity_match = re.search(r"cost ([A-Za-z]+) ([A-Za-z]+) Card", sentence)
-    if rarity_match:
-        out["rarity"] = rarity_match.group(1)
-        out["card_type"] = rarity_match.group(2)
-    character_match = re.search(r"Card for the ([A-Za-z ]+?)\.", sentence)
-    if character_match:
-        out["character"] = character_match.group(1)
-    return out
-
-
-def _infer_fields_from_templates(wikitext: str) -> dict[str, str]:
-    out: dict[str, str] = {}
-    parsed = mwparserfromhell.parse(wikitext)
-    for template in parsed.filter_templates(recursive=True):
-        name = str(template.name).strip().casefold()
-        parts = [clean_text(p.value) for p in template.params]
-        if name == "querylink" and len(parts) >= 3:
-            query = parts[1].casefold()
-            value = parts[2]
-            if "rarity:" in query:
-                out["rarity"] = value
-            if "type:" in query:
-                out["card_type"] = value
-        elif name == "kw" and parts:
-            value = parts[0]
-            if value.casefold() in {"ironclad", "silent", "defect", "watcher", "necrobinder"}:
-                out["character"] = value
-        elif name == "icon" and parts and "cost" not in out:
-            # Cost is usually the plain number immediately before the Icon template
-            before = str(wikitext).split(str(template), 1)[0]
-            match = re.search(r"is a[n]? ([Xx0-9]+)\s*$", clean_text(before))
-            if match:
-                out["cost"] = match.group(1)
-    return out
-
-
-def _extract_mechanics(description: str, upgraded: str | None) -> list[str]:
-    haystack = f"{description} {upgraded or ''}".casefold()
-    known = [
-        "block",
-        "poison",
-        "intangible",
-        "strength",
-        "dexterity",
-        "vulnerable",
-        "weak",
-        "draw",
-        "discard",
-        "exhaust",
-    ]
-    return [term for term in known if term in haystack]
-
-
-def _extract_mechanics_from_templates(wikitext: str) -> list[str]:
-    mechanics: list[str] = []
-    parsed = mwparserfromhell.parse(wikitext)
-    for template in parsed.filter_templates(recursive=True):
-        if str(template.name).strip().casefold() != "kw" or not template.params:
-            continue
-        value = clean_text(template.params[0].value).casefold()
-        if value not in {"ironclad", "silent", "defect", "watcher", "necrobinder"}:
-            mechanics.append(value)
-    return mechanics
-
-
-def _merge_mechanics(*groups: list[str]) -> list[str]:
-    out: list[str] = []
-    for group in groups:
-        for item in group:
-            if item and item not in out:
-                out.append(item)
-    return out
 
 
 def _write_sqlite(path: Path, cards: list[CardKnowledge]) -> None:
