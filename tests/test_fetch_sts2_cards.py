@@ -320,3 +320,74 @@ def test_fetch_wikitext_raises_on_api_error():
         _fetch_wikitext(client, "Slay the Spire 2:Nope")
     assert info.value.code == "missingtitle"
     assert "no such page" in info.value.info
+
+
+def test_with_retry_returns_value_on_first_success():
+    from tools.fetch_sts2_cards import _with_retry
+
+    calls = {"n": 0}
+
+    def op():
+        calls["n"] += 1
+        return "ok"
+
+    assert _with_retry(op, retries=3, base_delay=0) == "ok"
+    assert calls["n"] == 1
+
+
+def test_with_retry_retries_on_ratelimited_then_succeeds():
+    from tools.fetch_sts2_cards import WikiApiError, _with_retry
+
+    calls = {"n": 0}
+
+    def op():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise WikiApiError("ratelimited", "slow down")
+        return "ok"
+
+    assert _with_retry(op, retries=3, base_delay=0) == "ok"
+    assert calls["n"] == 3
+
+
+def test_with_retry_does_not_retry_on_missingtitle():
+    from tools.fetch_sts2_cards import WikiApiError, _with_retry
+
+    calls = {"n": 0}
+
+    def op():
+        calls["n"] += 1
+        raise WikiApiError("missingtitle", "no such page")
+
+    with pytest.raises(WikiApiError):
+        _with_retry(op, retries=3, base_delay=0)
+    assert calls["n"] == 1
+
+
+def test_with_retry_retries_on_httpx_transport_error():
+    from tools.fetch_sts2_cards import _with_retry
+
+    calls = {"n": 0}
+
+    def op():
+        calls["n"] += 1
+        if calls["n"] < 2:
+            raise httpx.ConnectError("boom")
+        return "ok"
+
+    assert _with_retry(op, retries=3, base_delay=0) == "ok"
+    assert calls["n"] == 2
+
+
+def test_with_retry_gives_up_after_retries_exhausted():
+    from tools.fetch_sts2_cards import WikiApiError, _with_retry
+
+    calls = {"n": 0}
+
+    def op():
+        calls["n"] += 1
+        raise WikiApiError("ratelimited", "still slow")
+
+    with pytest.raises(WikiApiError):
+        _with_retry(op, retries=2, base_delay=0)
+    assert calls["n"] == 3  # initial attempt + 2 retries

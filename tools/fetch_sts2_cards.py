@@ -7,6 +7,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,33 @@ from spiresight.knowledge.models import CardKnowledge, normalize_query
 
 API_URL = "https://slaythespire.wiki.gg/api.php"
 SCRIPT_VERSION = "1"
+
+
+_RETRYABLE_API_CODES = {"ratelimited", "internal_api_error_DBError", "readonly"}
+
+
+def _with_retry(operation, *, retries: int = 3, base_delay: float = 0.5):
+    """Call `operation()` with exponential backoff on retryable failures.
+
+    Retries on:
+      - httpx.HTTPError (network + 5xx, see _is_retryable_http_error)
+      - WikiApiError with a retryable code
+
+    Re-raises immediately on non-retryable WikiApiError codes.
+    Total attempts = retries + 1.
+    """
+    attempt = 0
+    while True:
+        try:
+            return operation()
+        except WikiApiError as exc:
+            if exc.code not in _RETRYABLE_API_CODES or attempt >= retries:
+                raise
+        except httpx.HTTPError:
+            if attempt >= retries:
+                raise
+        time.sleep(base_delay * (2 ** attempt))
+        attempt += 1
 
 
 class WikiApiError(RuntimeError):
