@@ -226,3 +226,40 @@ def test_parse_structured_fields_ignores_post_lead_templates():
     fields = parse_structured_fields(wikitext)
     assert fields["rarity"] == "Common"
     assert fields["character"] == "Silent"
+
+
+def test_extract_mechanics_keeps_lead_kw_keywords():
+    from tools.fetch_sts2_cards import extract_mechanics
+
+    wikitext = (
+        "{{C|Deflect||2}} gives 4 {{KW|Block||2}} and applies {{KW|Weak||2}}.\n"
+        "== Update History ==\n"
+    )
+    assert extract_mechanics(wikitext) == ["block", "weak"]
+
+
+def test_extract_mechanics_ignores_post_lead_sections():
+    from tools.fetch_sts2_cards import extract_mechanics
+
+    wikitext = (
+        "Lead with {{KW|Block||2}}.\n"
+        "== Update History ==\n"
+        "{{KW|Goopy||2}} {{KW|Enchant||2}}\n"
+        "== Related Cards ==\n"
+        "{{KW|Orobas||2}}\n"
+    )
+    assert extract_mechanics(wikitext) == ["block"]
+
+
+def test_extract_mechanics_excludes_character_keywords():
+    from tools.fetch_sts2_cards import extract_mechanics
+
+    wikitext = "{{KW|Silent||2}} card with {{KW|Block||2}} and {{KW|Ironclad||2}}."
+    assert extract_mechanics(wikitext) == ["block"]
+
+
+def test_extract_mechanics_dedups_and_preserves_order():
+    from tools.fetch_sts2_cards import extract_mechanics
+
+    wikitext = "{{KW|Block||2}} {{KW|Weak||2}} {{KW|Block||2}}"
+    assert extract_mechanics(wikitext) == ["block", "weak"]

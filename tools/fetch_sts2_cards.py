@@ -89,6 +89,26 @@ def parse_structured_fields(wikitext: str) -> dict[str, str]:
     return out
 
 
+def extract_mechanics(wikitext: str) -> list[str]:
+    """Return lowercased keywords from {{KW|...}} templates in the lead only.
+
+    Character names (Silent, Ironclad, ...) are excluded. Duplicates removed,
+    insertion order preserved.
+    """
+    lead = extract_lead(wikitext)
+    parsed = mwparserfromhell.parse(lead)
+    out: list[str] = []
+    for template in parsed.filter_templates(recursive=True):
+        if str(template.name).strip().casefold() != "kw" or not template.params:
+            continue
+        value = clean_text(template.params[0].value).casefold()
+        if not value or value in _CHARACTER_VALUES:
+            continue
+        if value not in out:
+            out.append(value)
+    return out
+
+
 def _extract_cost_before_se_icon(lead: str) -> str | None:
     parsed = mwparserfromhell.parse(lead)
     for template in parsed.filter_templates(recursive=True):
