@@ -148,3 +148,28 @@ def test_expand_templates_preserves_keyword_labels():
     # Icon templates are dropped to empty
     assert "SE" not in out
     assert "Icon" not in out
+
+
+def test_extract_lead_returns_text_before_first_section_header():
+    from tools.fetch_sts2_cards import extract_lead
+
+    wikitext = (
+        "{{Sequel Disambiguation}}{{Card Infobox|Deflect||2}}\n"
+        "Lead paragraph with {{KW|Block||2}}.\n"
+        "== Update History ==\n"
+        "* v0.98 added {{KW|Goopy||2}}.\n"
+        "== Related Cards ==\n"
+        "{{KW|Enchant||2}}\n"
+    )
+    lead = extract_lead(wikitext)
+    assert "Block" in lead
+    assert "Goopy" not in lead
+    assert "Enchant" not in lead
+    assert "Update History" not in lead
+
+
+def test_extract_lead_returns_whole_wikitext_when_no_headers():
+    from tools.fetch_sts2_cards import extract_lead
+
+    wikitext = "Just a one-liner {{KW|Block||2}} with no section header."
+    assert extract_lead(wikitext) == wikitext

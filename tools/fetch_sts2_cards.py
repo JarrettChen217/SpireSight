@@ -39,6 +39,20 @@ def clean_text(value: Any) -> str:
     return text.strip()
 
 
+_SECTION_HEADER_RE = re.compile(r"^==+.*==+\s*$", re.MULTILINE)
+
+
+def extract_lead(wikitext: str) -> str:
+    """Return wikitext up to (but not including) the first '==…==' section header.
+
+    If no section header is found, return the whole text.
+    """
+    match = _SECTION_HEADER_RE.search(wikitext)
+    if match is None:
+        return wikitext
+    return wikitext[: match.start()]
+
+
 def expand_templates(wikitext: str) -> str:
     """Rewrite StS2-specific MediaWiki templates to their visible text label.
 
