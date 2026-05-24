@@ -19,6 +19,13 @@ from spiresight.knowledge.models import CardKnowledge, normalize_query
 
 API_URL = "https://slaythespire.wiki.gg/api.php"
 SCRIPT_VERSION = "1"
+CARDS_LIST_PAGE = "Slay the Spire 2:Cards List"
+_NON_CARD_TITLES = {
+    "Slay the Spire 2:Block",
+    "Slay the Spire 2:Strength",
+    "Slay the Spire 2:Vulnerable",
+    "Slay the Spire 2:Cards List",
+}
 
 
 def slugify(name: str) -> str:
@@ -48,24 +55,30 @@ def parse_card_wikitext(
             fields[clean_text(param.name).casefold()] = clean_text(param.value)
         break
 
-    name = fields.get("name") or title
-    description = fields.get("description") or fields.get("text") or ""
+    name = fields.get("name") or _display_title(title)
+    sentence = _extract_card_sentence(wikitext)
+    description = fields.get("description") or fields.get("text") or sentence
     upgraded = (
         fields.get("upgrade")
         or fields.get("upgraded_description")
         or fields.get("upgraded description")
     )
+    inferred = _infer_fields_from_sentence(sentence)
+    inferred.update(_infer_fields_from_templates(wikitext))
     return CardKnowledge(
         id=slugify(name),
         name_en=name,
         aliases=[],
-        character=_lower_or_none(fields.get("character")),
-        rarity=_lower_or_none(fields.get("rarity")),
-        card_type=_lower_or_none(fields.get("type") or fields.get("card_type")),
-        cost=fields.get("cost") or None,
+        character=_lower_or_none(fields.get("character") or inferred.get("character")),
+        rarity=_lower_or_none(fields.get("rarity") or inferred.get("rarity")),
+        card_type=_lower_or_none(fields.get("type") or fields.get("card_type") or inferred.get("card_type")),
+        cost=fields.get("cost") or inferred.get("cost") or None,
         description=description,
         upgraded_description=upgraded or None,
-        mechanics=_extract_mechanics(description, upgraded),
+        mechanics=_merge_mechanics(
+            _extract_mechanics(description, upgraded),
+            _extract_mechanics_from_templates(wikitext),
+        ),
         source_name="wiki.gg",
         source_url=source_url,
         fetched_at=fetched_at,
@@ -151,31 +164,31 @@ def fetch_cards() -> tuple[list[CardKnowledge], list[str]]:
     fetched_at = datetime.now(tz=timezone.utc).isoformat()
     warnings: list[str] = ["secondary source verification skipped"]
     with httpx.Client(timeout=30.0, headers={"User-Agent": "SpireSight card fetcher"}) as client:
-        titles = _fetch_category_titles(client)
+        titles = _fetch_card_list_titles(client)
         cards: list[CardKnowledge] = []
         for title in titles:
             source_url = f"https://slaythespire.wiki.gg/wiki/{title.replace(' ', '_')}"
             try:
                 wikitext = _fetch_wikitext(client, title)
-                cards.append(
-                    parse_card_wikitext(
-                        title=title,
-                        wikitext=wikitext,
-                        source_url=source_url,
-                        fetched_at=fetched_at,
-                    )
+                card = parse_card_wikitext(
+                    title=title,
+                    wikitext=wikitext,
+                    source_url=source_url,
+                    fetched_at=fetched_at,
                 )
             except Exception as exc:  # noqa: BLE001
                 warnings.append(f"{title}: wikitext failed ({exc}); trying html")
                 html = client.get(source_url).text
-                cards.append(
-                    parse_card_html(
-                        title=title,
-                        html=html,
-                        source_url=source_url,
-                        fetched_at=fetched_at,
-                    )
+                card = parse_card_html(
+                    title=title,
+                    html=html,
+                    source_url=source_url,
+                    fetched_at=fetched_at,
                 )
+            if _looks_like_card(card):
+                cards.append(card)
+            else:
+                warnings.append(f"{title}: skipped non-card page")
     return cards, warnings
 
 
@@ -194,6 +207,35 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def filter_candidate_titles(links: list[dict[str, Any]]) -> list[str]:
+    titles: list[str] = []
+    seen: set[str] = set()
+    for link in links:
+        title = str(link.get("*", ""))
+        if link.get("ns") != 3000:
+            continue
+        if not title.startswith("Slay the Spire 2:"):
+            continue
+        if title in _NON_CARD_TITLES:
+            continue
+        if title in seen:
+            continue
+        seen.add(title)
+        titles.append(title)
+    return titles
+
+
+def _fetch_card_list_titles(client: httpx.Client) -> list[str]:
+    params = {
+        "action": "parse",
+        "page": CARDS_LIST_PAGE,
+        "prop": "links",
+        "format": "json",
+    }
+    data = client.get(API_URL, params=params).json()
+    return filter_candidate_titles(data.get("parse", {}).get("links", []))
+
+
 def _fetch_category_titles(client: httpx.Client) -> list[str]:
     params = {
         "action": "query",
@@ -208,18 +250,13 @@ def _fetch_category_titles(client: httpx.Client) -> list[str]:
 
 def _fetch_wikitext(client: httpx.Client, title: str) -> str:
     params = {
-        "action": "query",
-        "prop": "revisions",
-        "rvprop": "content",
-        "rvslots": "main",
-        "titles": title,
+        "action": "parse",
+        "page": title,
+        "prop": "wikitext",
         "format": "json",
     }
     data = client.get(API_URL, params=params).json()
-    pages = data.get("query", {}).get("pages", {})
-    page = next(iter(pages.values()))
-    revisions = page.get("revisions", [])
-    return revisions[0]["slots"]["main"]["*"]
+    return data["parse"]["wikitext"]["*"]
 
 
 def _first_text(soup: BeautifulSoup, selectors: list[str]) -> str:
@@ -244,6 +281,63 @@ def _lower_or_none(value: str | None) -> str | None:
     return value.casefold() if value else None
 
 
+def _display_title(title: str) -> str:
+    return title.split(":", 1)[1] if title.startswith("Slay the Spire 2:") else title
+
+
+def _extract_card_sentence(wikitext: str) -> str:
+    text = clean_text(wikitext)
+    gives_match = re.search(r"(?:It|They|This card) .+?(?:\.\s|$)", text)
+    if gives_match:
+        return gives_match.group(0).strip()
+    match = re.search(r"\b is a[n]? .+?(?:\.\s|$)", text)
+    if not match:
+        return ""
+    sentence = match.group(0).strip()
+    return sentence[1:].strip() if sentence.startswith(" ") else sentence
+
+
+def _infer_fields_from_sentence(sentence: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    cost_match = re.search(r"is a[n]? ([Xx0-9]+) .*? cost", sentence)
+    if cost_match:
+        out["cost"] = cost_match.group(1)
+    rarity_match = re.search(r"cost ([A-Za-z]+) ([A-Za-z]+) Card", sentence)
+    if rarity_match:
+        out["rarity"] = rarity_match.group(1)
+        out["card_type"] = rarity_match.group(2)
+    character_match = re.search(r"Card for the ([A-Za-z ]+?)\.", sentence)
+    if character_match:
+        out["character"] = character_match.group(1)
+    return out
+
+
+def _infer_fields_from_templates(wikitext: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    parsed = mwparserfromhell.parse(wikitext)
+    for template in parsed.filter_templates(recursive=True):
+        name = str(template.name).strip().casefold()
+        parts = [clean_text(p.value) for p in template.params]
+        if name == "querylink" and len(parts) >= 3:
+            query = parts[1].casefold()
+            value = parts[2]
+            if "rarity:" in query:
+                out["rarity"] = value
+            if "type:" in query:
+                out["card_type"] = value
+        elif name == "kw" and parts:
+            value = parts[0]
+            if value.casefold() in {"ironclad", "silent", "defect", "watcher", "necrobinder"}:
+                out["character"] = value
+        elif name == "icon" and parts and "cost" not in out:
+            # Cost is usually the plain number immediately before the Icon template
+            before = str(wikitext).split(str(template), 1)[0]
+            match = re.search(r"is a[n]? ([Xx0-9]+)\s*$", clean_text(before))
+            if match:
+                out["cost"] = match.group(1)
+    return out
+
+
 def _extract_mechanics(description: str, upgraded: str | None) -> list[str]:
     haystack = f"{description} {upgraded or ''}".casefold()
     known = [
@@ -259,6 +353,27 @@ def _extract_mechanics(description: str, upgraded: str | None) -> list[str]:
         "exhaust",
     ]
     return [term for term in known if term in haystack]
+
+
+def _extract_mechanics_from_templates(wikitext: str) -> list[str]:
+    mechanics: list[str] = []
+    parsed = mwparserfromhell.parse(wikitext)
+    for template in parsed.filter_templates(recursive=True):
+        if str(template.name).strip().casefold() != "kw" or not template.params:
+            continue
+        value = clean_text(template.params[0].value).casefold()
+        if value not in {"ironclad", "silent", "defect", "watcher", "necrobinder"}:
+            mechanics.append(value)
+    return mechanics
+
+
+def _merge_mechanics(*groups: list[str]) -> list[str]:
+    out: list[str] = []
+    for group in groups:
+        for item in group:
+            if item and item not in out:
+                out.append(item)
+    return out
 
 
 def _write_sqlite(path: Path, cards: list[CardKnowledge]) -> None:
@@ -284,6 +399,10 @@ def _write_sqlite(path: Path, cards: list[CardKnowledge]) -> None:
         path.unlink(missing_ok=True)
     finally:
         con.close()
+
+
+def _looks_like_card(card: CardKnowledge) -> bool:
+    return bool(card.description and (card.card_type or card.rarity or card.cost))
 
 
 if __name__ == "__main__":

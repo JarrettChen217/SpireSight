@@ -54,6 +54,8 @@ def card_knowledge_dir() -> Path:
     override = os.environ.get("SPIRESIGHT_CARD_KNOWLEDGE_DIR")
     if override:
         return Path(override)
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "data" / "sts2_cards"
     return repo_root() / "data" / "sts2_cards"
 
 

@@ -1,0 +1,885 @@
+[
+  {
+    "id": "bash",
+    "name_en": "Bash",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "ancient",
+    "card_type": "attack",
+    "cost": "2",
+    "description": "It is not found in card rewards.",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "orobas",
+      "enchant"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Bash",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "defend",
+    "name_en": "Defend",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "basic",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It gives 5 (8 if upgraded) .",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "adroit",
+      "enchant",
+      "spiral",
+      "ethereal",
+      "goopy"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Defend_(Ironclad)",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "strike",
+    "name_en": "Strike",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "basic",
+    "card_type": "attack",
+    "cost": "1",
+    "description": "It deals 6 (9 if upgraded) damage.",
+    "upgraded_description": null,
+    "mechanics": [
+      "enchant",
+      "spiral",
+      "ethereal",
+      "tezcatara's ember"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Strike_(Ironclad)",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "anger",
+    "name_en": "Anger",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "common",
+    "card_type": "attack",
+    "cost": "0",
+    "description": "It deals 6 (8 if upgraded) damage, and adds a copy of itself into the discard pile.",
+    "upgraded_description": null,
+    "mechanics": [
+      "discard"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Anger",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "blood_wall",
+    "name_en": "Blood Wall",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "common",
+    "card_type": "skill",
+    "cost": "2",
+    "description": "It gives 16 (20 if upgraded) and makes the user lose 2 HP.",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "strength",
+      "intangible",
+      "buffer"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Blood_Wall",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "bloodletting",
+    "name_en": "Bloodletting",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "common",
+    "card_type": "skill",
+    "cost": "0",
+    "description": "It gives 2 (3 if upgraded) Energy and makes the user lose 3 HP.",
+    "upgraded_description": null,
+    "mechanics": [
+      "strength",
+      "intangible",
+      "buffer"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Bloodletting",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "breakthrough",
+    "name_en": "Breakthrough",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "common",
+    "card_type": "attack",
+    "cost": "1",
+    "description": "It deals 9 (13 if upgraded) damage to all enemies, and makes the user lose 1 HP.",
+    "upgraded_description": null,
+    "mechanics": [
+      "strength",
+      "buffer"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Breakthrough",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "headbutt",
+    "name_en": "Headbutt",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "common",
+    "card_type": "attack",
+    "cost": "1",
+    "description": "It deals 9 (12 if upgraded) damage, and allows the player to place one card from their discard pile on top of their draw pile.",
+    "upgraded_description": null,
+    "mechanics": [
+      "draw",
+      "discard"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Headbutt",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "perfected_strike",
+    "name_en": "Perfected Strike",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "common",
+    "card_type": "attack",
+    "cost": "2",
+    "description": "It deals 6 damage, which is increased by 2 (3 if upgraded) for every card with \"Strike\" in its name that is in your deck when this card is played.",
+    "upgraded_description": null,
+    "mechanics": [
+      "corrupted",
+      "block",
+      "clone",
+      "replay"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Perfected_Strike",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "pommel_strike",
+    "name_en": "Pommel Strike",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "common",
+    "card_type": "attack",
+    "cost": "1",
+    "description": "It deals 9 (10 if upgraded) damage and draws 1 (2 if upgraded) card(s).",
+    "upgraded_description": null,
+    "mechanics": [
+      "draw",
+      "exhaust"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Pommel_Strike",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "shrug_it_off",
+    "name_en": "Shrug It Off",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "common",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It gives 8 (11 if upgraded) and draws 1 card.",
+    "upgraded_description": null,
+    "mechanics": [
+      "draw",
+      "block"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Shrug_It_Off",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "bludgeon",
+    "name_en": "Bludgeon",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "uncommon",
+    "card_type": "attack",
+    "cost": "3",
+    "description": "It deals 32 (42 if upgraded) damage.",
+    "upgraded_description": null,
+    "mechanics": [
+      "block"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Bludgeon",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "colossus",
+    "name_en": "Colossus",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "uncommon",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It grants 5 (8 if upgraded) and one , reducing your damage taken from enemies by half.",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "vulnerable"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Colossus",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "demonic_shield",
+    "name_en": "Demonic Shield",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "uncommon",
+    "card_type": "skill",
+    "cost": "0",
+    "description": "It gives another player equal to the user's own , makes the user lose 1 HP, and itself (if upgraded, it does not .).",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "exhaust",
+      "strength",
+      "buffer"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Demonic_Shield",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "dominate",
+    "name_en": "Dominate",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "uncommon",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It applies 1 (2 if upgraded) , then gives the player equal to the amount of on the enemy.",
+    "upgraded_description": null,
+    "mechanics": [
+      "vulnerable",
+      "strength",
+      "exhaust"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Dominate",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "expect_a_fight",
+    "name_en": "Expect a Fight",
+    "aliases": [],
+    "character": null,
+    "rarity": "uncommon",
+    "card_type": "attack",
+    "cost": null,
+    "description": "It generates 1 for each in hand, and denies the ability to gain additional for the rest of the turn.",
+    "upgraded_description": null,
+    "mechanics": [
+      "block"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Expect_a_Fight",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "fight_me",
+    "name_en": "Fight Me!",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "uncommon",
+    "card_type": "attack",
+    "cost": "2",
+    "description": "It deals 5 (6 if upgraded) damage twice, then gives the player 3 (4 if upgraded) and gives the target 1 .",
+    "upgraded_description": null,
+    "mechanics": [
+      "strength",
+      "block"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Fight_Me!",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "hemokinesis",
+    "name_en": "Hemokinesis",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "uncommon",
+    "card_type": "attack",
+    "cost": "1",
+    "description": "It deals 15 (20 if upgraded) damage and makes the user lose 2 HP.",
+    "upgraded_description": null,
+    "mechanics": [
+      "strength",
+      "intangible",
+      "buffer"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Hemokinesis",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "infernal_blade",
+    "name_en": "Infernal Blade",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "uncommon",
+    "card_type": "attack",
+    "cost": null,
+    "description": "It generates a random card, which remains free to play until it is played, or the end of turn.",
+    "upgraded_description": null,
+    "mechanics": [
+      "exhaust"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Infernal_Blade",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "inferno",
+    "name_en": "Inferno",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "uncommon",
+    "card_type": "power",
+    "cost": "1",
+    "description": "is a redesign for .",
+    "upgraded_description": null,
+    "mechanics": [
+      "strength",
+      "buffer",
+      "tanx"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Inferno",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "spite",
+    "name_en": "Spite",
+    "aliases": [],
+    "character": null,
+    "rarity": "uncommon",
+    "card_type": "attack",
+    "cost": "0",
+    "description": "is a reference to the soft drink 'Sprite'.",
+    "upgraded_description": null,
+    "mechanics": [
+      "corrupted",
+      "strength"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Spite",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "weak",
+    "name_en": "Weak",
+    "aliases": [],
+    "character": "silent",
+    "rarity": null,
+    "card_type": "attacks",
+    "cost": null,
+    "description": "is a Debuff, it compounds with for all players during Multiplayer.",
+    "upgraded_description": null,
+    "mechanics": [
+      "strength",
+      "vigor",
+      "enchant",
+      "sharp",
+      "vigorous",
+      "momentum",
+      "vulnerable",
+      "poison",
+      "doom",
+      "osty"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Weak",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "aggression",
+    "name_en": "Aggression",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "rare",
+    "card_type": "power",
+    "cost": "1",
+    "description": "It becomes when upgraded.",
+    "upgraded_description": null,
+    "mechanics": [
+      "innate"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Aggression",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "brand",
+    "name_en": "Brand",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "rare",
+    "card_type": "skill",
+    "cost": "0",
+    "description": "It a card in hand, makes the user lose 1 HP, and gives the user 1 (2 if upgraded) .",
+    "upgraded_description": null,
+    "mechanics": [
+      "exhaust",
+      "strength",
+      "block",
+      "buffer"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Brand",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "cruelty",
+    "name_en": "Cruelty",
+    "aliases": [],
+    "character": "necrobinder",
+    "rarity": "rare",
+    "card_type": "attack",
+    "cost": "1",
+    "description": "It gives the player 25 stacks (50 stacks if upgraded) of , causing them to deal 25% more base damage (50% more if upgraded) with to enemies.",
+    "upgraded_description": null,
+    "mechanics": [
+      "strength",
+      "upgrade",
+      "vulnerable"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Cruelty",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "demon_form",
+    "name_en": "Demon Form",
+    "aliases": [],
+    "character": null,
+    "rarity": "rare",
+    "card_type": "power",
+    "cost": "3",
+    "description": "It gives 2 (3 if upgraded) , which gives that amount of at the start of every turn.",
+    "upgraded_description": null,
+    "mechanics": [
+      "strength"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Demon_Form",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "offering",
+    "name_en": "Offering",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "rare",
+    "card_type": "skill",
+    "cost": "0",
+    "description": "It costs 6 HP to play, gives 2 energy, draws 3 (5 if upgraded) cards, and itself.",
+    "upgraded_description": null,
+    "mechanics": [
+      "draw",
+      "exhaust",
+      "strength",
+      "intangible",
+      "buffer"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Offering",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "one_two_punch",
+    "name_en": "One-Two Punch",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "rare",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It gives one stack (two stacks if upgraded) of , copying the next Attack (next two Attacks) played that turn.",
+    "upgraded_description": null,
+    "mechanics": [
+      "vulnerable",
+      "strength",
+      "weak",
+      "retain",
+      "corrupted",
+      "fatal",
+      "exhaust",
+      "stunned"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:One-Two_Punch",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "giant_rock",
+    "name_en": "Giant Rock",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "token",
+    "card_type": "attacks",
+    "cost": "1",
+    "description": "It deals 16 (20 if upgraded) damage.",
+    "upgraded_description": null,
+    "mechanics": [
+      "transform"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Giant_Rock",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "unmovable",
+    "name_en": "Unmovable",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "rare",
+    "card_type": "power",
+    "cost": null,
+    "description": "It gives a stack of , doubling the first instance of gained from a card each turn.",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "dexterity",
+      "frail"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Unmovable",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "corruption",
+    "name_en": "Corruption",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "ancient",
+    "card_type": "skill",
+    "cost": null,
+    "description": "It gives 1 , which makes all have an cost of 0, and them after they are played.",
+    "upgraded_description": null,
+    "mechanics": [
+      "exhaust",
+      "darv"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Corruption",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "clash",
+    "name_en": "Clash",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "event",
+    "card_type": "attack",
+    "cost": "0",
+    "description": "It can only be played if every card in your Hand is an , and deals 14 (18 if upgraded) damage.",
+    "upgraded_description": null,
+    "mechanics": [
+      "exhaust"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Clash",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "dual_wield",
+    "name_en": "Dual Wield",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "event",
+    "card_type": "power",
+    "cost": "1",
+    "description": "It creates a copy (2 if upgraded) of an or in your Hand.",
+    "upgraded_description": null,
+    "mechanics": [],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Dual_Wield",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "entrench",
+    "name_en": "Entrench",
+    "aliases": [],
+    "character": "ironclad",
+    "rarity": "event",
+    "card_type": "skill",
+    "cost": null,
+    "description": "It doubles your .",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "enchant",
+      "nimble"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Entrench",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "defend",
+    "name_en": "Defend",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "basic",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It gives 5 (8 if upgraded) .",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "adroit",
+      "enchant",
+      "spiral",
+      "ethereal",
+      "goopy"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Defend_(Silent)",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "neutralize",
+    "name_en": "Neutralize",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "ancient",
+    "card_type": "attacks",
+    "cost": "0",
+    "description": "It is not found in card rewards.",
+    "upgraded_description": null,
+    "mechanics": [
+      "weak",
+      "orobas",
+      "upgrade",
+      "enchant"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Neutralize",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "strike",
+    "name_en": "Strike",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "basic",
+    "card_type": "attack",
+    "cost": "1",
+    "description": "It deals 6 (9 if upgraded) damage.",
+    "upgraded_description": null,
+    "mechanics": [
+      "enchant",
+      "spiral",
+      "ethereal",
+      "tezcatara's ember"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Strike_(Silent)",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "survivor",
+    "name_en": "Survivor",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "basic",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It gives 8 (11 if upgraded) and makes you select 1 card in hand to .",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "sly"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Survivor",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "backflip",
+    "name_en": "Backflip",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "common",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It gives 5 (8 if Upgraded) and draws 2 cards.",
+    "upgraded_description": null,
+    "mechanics": [
+      "draw",
+      "block"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Backflip",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "blade_dance",
+    "name_en": "Blade Dance",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "common",
+    "card_type": "attack",
+    "cost": "1",
+    "description": "It adds 3 (4 if upgraded) cards to your hand.",
+    "upgraded_description": null,
+    "mechanics": [
+      "exhaust"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Blade_Dance",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "shiv",
+    "name_en": "Shiv",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "token",
+    "card_type": "attack",
+    "cost": "0",
+    "description": "It deals 4 damage then itself.",
+    "upgraded_description": null,
+    "mechanics": [
+      "exhaust",
+      "inky",
+      "retain"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Shiv",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "cloak_and_dagger",
+    "name_en": "Cloak and Dagger",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "common",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It gives 6 and adds 1 (2 if upgraded) to your hand.",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "exhaust"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Cloak_and_Dagger",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "deflect",
+    "name_en": "Deflect",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "common",
+    "card_type": "skill",
+    "cost": "0",
+    "description": "It gives 4 (7 if upgraded) .",
+    "upgraded_description": null,
+    "mechanics": [
+      "block"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Deflect",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "dodge_and_roll",
+    "name_en": "Dodge and Roll",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "common",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It gains 4 (6 if ) and also gives stacks of equal to the amount of gained.",
+    "upgraded_description": null,
+    "mechanics": [
+      "block",
+      "upgrade",
+      "dexterity",
+      "frail"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Dodge_and_Roll",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "leading_strike",
+    "name_en": "Leading Strike",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "common",
+    "card_type": "attack",
+    "cost": "1",
+    "description": "It deals 7 (10 if upgraded) damage and adds 1 to the player's hand.",
+    "upgraded_description": null,
+    "mechanics": [],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Leading_Strike",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "prepared",
+    "name_en": "Prepared",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "common",
+    "card_type": "statuses",
+    "cost": "0",
+    "description": "It makes the user draw 1 (2 if upgraded) card and discard 1 (2 if upgraded) card.",
+    "upgraded_description": null,
+    "mechanics": [
+      "draw",
+      "discard",
+      "sly",
+      "block"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Prepared",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  },
+  {
+    "id": "acrobatics",
+    "name_en": "Acrobatics",
+    "aliases": [],
+    "character": "silent",
+    "rarity": "uncommon",
+    "card_type": "skill",
+    "cost": "1",
+    "description": "It draws 3 (4 if Upgraded) cards and makes you select 1 card in hand to .",
+    "upgraded_description": null,
+    "mechanics": [
+      "draw",
+      "sly",
+      "block"
+    ],
+    "source_name": "wiki.gg",
+    "source_url": "https://slaythespire.wiki.gg/wiki/Slay_the_Spire_2:Acrobatics",
+    "fetched_at": "2026-05-24T21:24:17.286103Z"
+  }
+]
