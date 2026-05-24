@@ -304,13 +304,25 @@ def write_outputs(output: Path, cards: list[CardKnowledge], *, warnings: list[st
 
 def fetch_cards() -> tuple[list[CardKnowledge], list[str]]:
     fetched_at = datetime.now(tz=timezone.utc).isoformat()
-    warnings: list[str] = ["secondary source verification skipped"]
-    with httpx.Client(timeout=30.0, headers={"User-Agent": "SpireSight card fetcher"}) as client:
-        titles = _fetch_card_list_titles(client)
-        cards: list[CardKnowledge] = []
+    warnings: list[str] = []
+    errors: list[str] = []
+    cards: list[CardKnowledge] = []
+    with httpx.Client(
+        timeout=30.0,
+        headers={"User-Agent": "SpireSight card fetcher (https://github.com/HaoChen217/SpireSight)"},
+    ) as client:
+        try:
+            titles = _with_retry(lambda: _fetch_card_list_titles(client))
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"cards-list fetch failed: {exc}") from exc
+
         for title in titles:
             source_url = f"https://slaythespire.wiki.gg/wiki/{title.replace(' ', '_')}"
-            wikitext = _fetch_wikitext(client, title)
+            try:
+                wikitext = _with_retry(lambda t=title: _fetch_wikitext(client, t))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{title}: {exc}")
+                continue
             card = parse_card_wikitext(
                 title=title,
                 wikitext=wikitext,
@@ -321,6 +333,11 @@ def fetch_cards() -> tuple[list[CardKnowledge], list[str]]:
                 cards.append(card)
             else:
                 warnings.append(f"{title}: skipped non-card page")
+
+    if errors:
+        sample = "; ".join(errors[:5])
+        more = "" if len(errors) <= 5 else f"; (+{len(errors) - 5} more)"
+        raise RuntimeError(f"{len(errors)} card fetches failed: {sample}{more}")
     return cards, warnings
 
 

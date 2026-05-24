@@ -391,3 +391,90 @@ def test_with_retry_gives_up_after_retries_exhausted():
     with pytest.raises(WikiApiError):
         _with_retry(op, retries=2, base_delay=0)
     assert calls["n"] == 3  # initial attempt + 2 retries
+
+
+@respx.mock
+def test_main_exits_nonzero_and_writes_no_output_when_any_card_fails(tmp_path, monkeypatch):
+    from tools import fetch_sts2_cards
+
+    # Cards List returns two candidate titles.
+    cards_list_payload = {
+        "parse": {
+            "links": [
+                {"ns": 3000, "*": "Slay the Spire 2:Deflect"},
+                {"ns": 3000, "*": "Slay the Spire 2:NotARealCard"},
+            ]
+        }
+    }
+    deflect_payload = {
+        "parse": {
+            "wikitext": {
+                "*": (
+                    "{{C|Deflect||2}} is a 0 {{Icon|SE|2}} cost "
+                    "{{QueryLink|Cards|rarity:Common&color:Silent|Common|2}} "
+                    "{{QueryLink|Cards|type:Skill&color:Silent|Skill|2}} "
+                    "Card for the {{KW|Silent||2}}. It gives 4 {{KW|Block||2}}."
+                )
+            }
+        }
+    }
+
+    def respond(request):
+        page = request.url.params.get("page")
+        if page == "Slay the Spire 2:Cards List":
+            return httpx.Response(200, json=cards_list_payload)
+        if page == "Slay the Spire 2:Deflect":
+            return httpx.Response(200, json=deflect_payload)
+        if page == "Slay the Spire 2:NotARealCard":
+            return httpx.Response(
+                200,
+                json={"error": {"code": "missingtitle", "info": "no such page"}},
+            )
+        raise AssertionError(f"unexpected page: {page}")
+
+    respx.get(fetch_sts2_cards.API_URL).mock(side_effect=respond)
+
+    output = tmp_path / "sts2_cards"
+    rc = fetch_sts2_cards.main(["--output", str(output)])
+    assert rc == 1
+    assert not (output / "cards.json").exists()
+    assert not (output / "metadata.json").exists()
+
+
+@respx.mock
+def test_main_exit_zero_when_all_cards_succeed(tmp_path):
+    from tools import fetch_sts2_cards
+
+    cards_list_payload = {
+        "parse": {
+            "links": [{"ns": 3000, "*": "Slay the Spire 2:Deflect"}]
+        }
+    }
+    deflect_payload = {
+        "parse": {
+            "wikitext": {
+                "*": (
+                    "{{C|Deflect||2}} is a 0 {{Icon|SE|2}} cost "
+                    "{{QueryLink|Cards|rarity:Common&color:Silent|Common|2}} "
+                    "{{QueryLink|Cards|type:Skill&color:Silent|Skill|2}} "
+                    "Card for the {{KW|Silent||2}}. It gives 4 {{KW|Block||2}}."
+                )
+            }
+        }
+    }
+
+    def respond(request):
+        page = request.url.params.get("page")
+        if page == "Slay the Spire 2:Cards List":
+            return httpx.Response(200, json=cards_list_payload)
+        return httpx.Response(200, json=deflect_payload)
+
+    respx.get(fetch_sts2_cards.API_URL).mock(side_effect=respond)
+
+    output = tmp_path / "sts2_cards"
+    rc = fetch_sts2_cards.main(["--output", str(output)])
+    assert rc == 0
+    cards = json.loads((output / "cards.json").read_text(encoding="utf-8"))
+    assert len(cards) == 1
+    assert cards[0]["name_en"] == "Deflect"
+    assert "block" in cards[0]["mechanics"]
