@@ -53,6 +53,61 @@ def extract_lead(wikitext: str) -> str:
     return wikitext[: match.start()]
 
 
+_CHARACTER_VALUES = {"ironclad", "silent", "defect", "watcher", "necrobinder"}
+
+
+def parse_structured_fields(wikitext: str) -> dict[str, str]:
+    """Harvest rarity / card_type / character / cost from lead-paragraph templates.
+
+    Returns a dict with only the keys that were found. Values are the wiki's
+    surface form (e.g., "Common", "Silent") — caller is responsible for
+    lowercasing where required by the data model.
+    """
+    lead = extract_lead(wikitext)
+    parsed = mwparserfromhell.parse(lead)
+    out: dict[str, str] = {}
+
+    for template in parsed.filter_templates(recursive=True):
+        name = str(template.name).strip().casefold()
+        params = [clean_text(p.value) for p in template.params]
+        if name == "querylink" and len(params) >= 3:
+            query = params[1].casefold()
+            label = params[2]
+            if "rarity:" in query and "rarity" not in out:
+                out["rarity"] = label
+            if "type:" in query and "card_type" not in out:
+                out["card_type"] = label
+        elif name == "kw" and params and "character" not in out:
+            if params[0].casefold() in _CHARACTER_VALUES:
+                out["character"] = params[0]
+
+    # Cost: text immediately before the first {{Icon|SE|...}} template in the lead.
+    cost = _extract_cost_before_se_icon(lead)
+    if cost is not None:
+        out["cost"] = cost
+
+    return out
+
+
+def _extract_cost_before_se_icon(lead: str) -> str | None:
+    parsed = mwparserfromhell.parse(lead)
+    for template in parsed.filter_templates(recursive=True):
+        if str(template.name).strip().casefold() != "icon":
+            continue
+        params = [clean_text(p.value) for p in template.params]
+        if not params or params[0].casefold() != "se":
+            continue
+        before_raw = str(lead).split(str(template), 1)[0]
+        before = mwparserfromhell.parse(before_raw).strip_code()
+        before = re.sub(r"\s+", " ", before).strip()
+        match = re.search(r"([Xx0-9]+)\s*$", before)
+        if match:
+            value = match.group(1)
+            return "X" if value.casefold() == "x" else value
+        return None
+    return None
+
+
 def expand_templates(wikitext: str) -> str:
     """Rewrite StS2-specific MediaWiki templates to their visible text label.
 

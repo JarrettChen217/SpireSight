@@ -173,3 +173,56 @@ def test_extract_lead_returns_whole_wikitext_when_no_headers():
 
     wikitext = "Just a one-liner {{KW|Block||2}} with no section header."
     assert extract_lead(wikitext) == wikitext
+
+
+def test_parse_structured_fields_extracts_rarity_type_character_cost():
+    from tools.fetch_sts2_cards import parse_structured_fields
+
+    wikitext = (
+        "{{Sequel Disambiguation}}{{Card Infobox|Deflect||2}}\n"
+        "{{C|Deflect||2}} is a 0 {{Icon|SE|2}} cost "
+        "{{QueryLink|Cards|rarity:Common&color:Silent|Common|2}} "
+        "{{QueryLink|Cards|type:Skill&color:Silent|Skill|2}} "
+        "Card for the {{KW|Silent||2}}.\n"
+        "== Update History ==\n"
+        "{{KW|Goopy||2}}\n"
+    )
+    fields = parse_structured_fields(wikitext)
+    assert fields == {
+        "rarity": "Common",
+        "card_type": "Skill",
+        "character": "Silent",
+        "cost": "0",
+    }
+
+
+def test_parse_structured_fields_handles_x_cost():
+    from tools.fetch_sts2_cards import parse_structured_fields
+
+    wikitext = (
+        "{{C|Whirlwind||2}} is a X {{Icon|SE|2}} cost "
+        "{{QueryLink|Cards|rarity:Uncommon&color:Ironclad|Uncommon|2}} "
+        "{{QueryLink|Cards|type:Attack&color:Ironclad|Attack|2}} "
+        "Card for the {{KW|Ironclad||2}}."
+    )
+    fields = parse_structured_fields(wikitext)
+    assert fields["cost"] == "X"
+    assert fields["character"] == "Ironclad"
+
+
+def test_parse_structured_fields_ignores_post_lead_templates():
+    from tools.fetch_sts2_cards import parse_structured_fields
+
+    wikitext = (
+        "{{C|Card||2}} is a 1 {{Icon|SE|2}} cost "
+        "{{QueryLink|Cards|rarity:Common&color:Silent|Common|2}} "
+        "{{QueryLink|Cards|type:Skill&color:Silent|Skill|2}} "
+        "Card for the {{KW|Silent||2}}.\n"
+        "== Related ==\n"
+        # These post-lead templates must NOT override the lead values.
+        "{{QueryLink|Cards|rarity:Rare&color:Silent|Rare|2}}\n"
+        "{{KW|Ironclad||2}}\n"
+    )
+    fields = parse_structured_fields(wikitext)
+    assert fields["rarity"] == "Common"
+    assert fields["character"] == "Silent"
