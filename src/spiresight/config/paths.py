@@ -42,6 +42,21 @@ def log_dir() -> Path:
     return config_dir() / "logs"
 
 
+def repo_root() -> Path:
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    return here.parents[3]
+
+
+def card_knowledge_dir() -> Path:
+    override = os.environ.get("SPIRESIGHT_CARD_KNOWLEDGE_DIR")
+    if override:
+        return Path(override)
+    return repo_root() / "data" / "sts2_cards"
+
+
 def ensure_dirs() -> None:
     config_dir().mkdir(parents=True, exist_ok=True)
     log_dir().mkdir(parents=True, exist_ok=True)

@@ -5,6 +5,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from spiresight.core.messages import Message
+from spiresight.core.request_trace import RequestTrace
 from spiresight.prompts.ui_locale import UILocale
 from spiresight.ui.widgets.conversation_transcript import ConversationTranscript
 from spiresight.ui.widgets.output_view import TranscriptScrollMode
@@ -76,8 +77,11 @@ class ChatTab(QWidget):
     def append_user_message(self, text: str, *, image_png: bytes | None = None) -> None:
         self._transcript.append_user_message(text, image_png=image_png)
 
-    def begin_assistant_turn(self) -> None:
-        self._transcript.begin_assistant_turn()
+    def begin_assistant_turn(self, *, trace: RequestTrace | None = None) -> None:
+        self._transcript.begin_assistant_turn(trace=trace)
+
+    def update_trace(self, trace: RequestTrace) -> None:
+        self._transcript.update_trace(trace)
 
     def render_turns(self, turns: tuple[Message, ...]) -> None:
         self._transcript.render_turns(turns)

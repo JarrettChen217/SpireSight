@@ -15,7 +15,9 @@ from PySide6.QtWidgets import (
 )
 
 from spiresight.core.messages import Message
+from spiresight.core.request_trace import RequestTrace
 from spiresight.ui.widgets.output_view import OutputView, TranscriptScrollMode
+from spiresight.ui.widgets.request_trace_widget import RequestTraceWidget
 
 _USER_THUMB_W, _USER_THUMB_H = 64, 36
 
@@ -87,6 +89,7 @@ class ConversationTranscript(QWidget):
         self._scroll.setWidget(self._body)
 
         self._active_output: OutputView | None = None
+        self._active_trace: RequestTraceWidget | None = None
         self._turn_widgets = 0
 
     def set_transcript_mode(
@@ -103,6 +106,7 @@ class ConversationTranscript(QWidget):
 
     def reset(self) -> None:
         self._active_output = None
+        self._active_trace = None
         self._turn_widgets = 0
         while self._layout.count() > 1:
             item = self._layout.takeAt(0)
@@ -119,16 +123,23 @@ class ConversationTranscript(QWidget):
         bubble = _UserMessageBubble(text, image_png=image_png)
         self._insert_before_stretch(bubble)
 
-    def begin_assistant_turn(self) -> None:
+    def begin_assistant_turn(self, *, trace: RequestTrace | None = None) -> None:
         if self._active_output is not None:
             self._active_output.finalize()
             self._active_output = None
+            self._active_trace = None
 
         wrap = QWidget()
         wrap.setObjectName("bubble-assistant-wrap")
         wrap_layout = QVBoxLayout(wrap)
         wrap_layout.setContentsMargins(0, 0, 0, 0)
         wrap_layout.setSpacing(0)
+
+        if trace is not None:
+            trace_widget = RequestTraceWidget()
+            trace_widget.set_trace(trace)
+            wrap_layout.addWidget(trace_widget)
+            self._active_trace = trace_widget
 
         out = OutputView()
         out.set_scroll_mode(
@@ -142,6 +153,19 @@ class ConversationTranscript(QWidget):
         wrap_layout.addWidget(out)
         self._active_output = out
         self._insert_before_stretch(wrap)
+
+    def update_trace(self, trace: RequestTrace) -> None:
+        if self._active_trace is None:
+            if self._active_output is None:
+                return
+            parent = self._active_output.parentWidget()
+            layout = parent.layout() if parent is not None else None
+            if layout is None or not isinstance(layout, QVBoxLayout):
+                return
+            trace_widget = RequestTraceWidget()
+            layout.insertWidget(0, trace_widget)
+            self._active_trace = trace_widget
+        self._active_trace.set_trace(trace)
 
     def append_delta(self, text: str) -> None:
         if self._active_output is None:

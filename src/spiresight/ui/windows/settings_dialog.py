@@ -24,6 +24,7 @@ from spiresight.ui.workers.model_refresh_worker import ModelRefreshWorker
 _log = logging.getLogger(__name__)
 
 _IMAGE_POLICY_KEYS = ("full", "latest_only", "once_only", "never")
+_KNOWLEDGE_GATEWAY_KEYS = ("auto", "on", "off")
 
 
 def _presets_for(name: str) -> dict[str, str] | None:
@@ -169,6 +170,14 @@ class SettingsDialog(QDialog):
         self._image_policy.setCurrentIndex(max(0, idx))
         self._image_policy.setToolTip(loc.get("settings.image_policy_tip"))
 
+        self._knowledge_gateway_label = QLabel()
+        self._knowledge_gateway = QComboBox()
+        for key in _KNOWLEDGE_GATEWAY_KEYS:
+            self._knowledge_gateway.addItem("", userData=key)
+        idx = self._knowledge_gateway.findData(self._config.knowledge_gateway_mode)
+        self._knowledge_gateway.setCurrentIndex(max(0, idx))
+        self._knowledge_gateway.setToolTip(loc.get("settings.knowledge_gateway_tip"))
+
         self._fill_general_labels()
 
         form.addRow(self._lang_label, self._lang)
@@ -177,6 +186,7 @@ class SettingsDialog(QDialog):
         form.addRow(self._timeout_label, self._timeout)
         form.addRow(self._transcript_label, self._transcript_mode)
         form.addRow(self._image_policy_label, self._image_policy)
+        form.addRow(self._knowledge_gateway_label, self._knowledge_gateway)
         return page
 
     def _fill_general_labels(self) -> None:
@@ -196,6 +206,12 @@ class SettingsDialog(QDialog):
         for i, key in enumerate(_IMAGE_POLICY_KEYS):
             self._image_policy.setItemText(i, loc.get(f"settings.image_policy_{key}"))
         self._image_policy.setToolTip(loc.get("settings.image_policy_tip"))
+        self._knowledge_gateway_label.setText(loc.get("settings.knowledge_gateway"))
+        for i, key in enumerate(_KNOWLEDGE_GATEWAY_KEYS):
+            self._knowledge_gateway.setItemText(
+                i, loc.get(f"settings.knowledge_gateway_{key}"),
+            )
+        self._knowledge_gateway.setToolTip(loc.get("settings.knowledge_gateway_tip"))
 
     # ---- accept / persistence ----
 
@@ -215,4 +231,7 @@ class SettingsDialog(QDialog):
         policy = self._image_policy.currentData()
         if policy in _IMAGE_POLICY_KEYS:
             self._config.image_policy = policy
+        gateway_mode = self._knowledge_gateway.currentData()
+        if gateway_mode in _KNOWLEDGE_GATEWAY_KEYS:
+            self._config.knowledge_gateway_mode = gateway_mode
         self.accept()

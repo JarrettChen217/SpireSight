@@ -20,6 +20,7 @@ from PySide6.QtCore import QThread, Signal
 
 from spiresight.core.request import QuickActionRequest, FollowUpRequest
 from spiresight.core.messages import Message
+from spiresight.core.request_trace import RequestTrace, RequestTraceStep, TraceStatus
 from spiresight.core.runner import InferenceRunner, RequestSnapshot
 from spiresight.core.usage import CallRecord, LoggedMessage, LogStatus, RequestLog, TokenUsage, _truncate_preview
 from spiresight.llm.errors import RequestTimeoutError
@@ -56,6 +57,7 @@ class InferenceWorker(QThread):
     cancelled = Signal()
     request_logged = Signal(object)         # RequestLog (status="sent")
     response_logged = Signal(str, str, str, object)
+    trace_updated = Signal(object)          # RequestTrace
     # (correlation_id, status: LogStatus, response_text, error_or_None)
 
     def __init__(
@@ -140,12 +142,14 @@ class InferenceWorker(QThread):
 
     def run(self) -> None:
         t0 = time.monotonic()
+        trace_started = t0
         _log.info(
             "InferenceWorker.run started  corr=%s model=%s",
             self._correlation_id, self._model_id,
         )
         self.run_started.emit(self._model_id, self._input_preview)
         self.request_logged.emit(self._build_request_log())
+        self.trace_updated.emit(_trace(trace_started, "Call model", "running"))
 
         captured_usage: TokenUsage | None = None
         text_buffer: list[str] = []
@@ -180,6 +184,23 @@ class InferenceWorker(QThread):
             exc_to_emit = exc
         finally:
             full_text = "".join(text_buffer)
+            final_status: TraceStatus
+            if status == "ok":
+                final_status = "done"
+            elif status in {"error", "timeout"}:
+                final_status = "failed"
+            else:
+                final_status = "skipped"
+            summary = (
+                "Done"
+                if status == "ok"
+                else "Request stopped"
+                if status == "cancelled"
+                else "Request failed"
+            )
+            self.trace_updated.emit(
+                _trace(trace_started, summary, final_status, finished_at=time.monotonic())
+            )
             _log.info(
                 "InferenceWorker.run done  corr=%s status=%s total=%.3fs chars=%d",
                 self._correlation_id, status, time.monotonic() - t0, len(full_text),
@@ -202,3 +223,23 @@ class InferenceWorker(QThread):
             else:
                 assert exc_to_emit is not None
                 self.failed.emit(exc_to_emit)
+
+
+def _trace(
+    started_at: float,
+    summary: str,
+    model_status: TraceStatus,
+    *,
+    finished_at: float | None = None,
+) -> RequestTrace:
+    return RequestTrace(
+        started_at=started_at,
+        finished_at=finished_at,
+        summary=summary,
+        steps=(
+            RequestTraceStep("capture", "Capture screenshot", "done"),
+            RequestTraceStep("knowledge", "Match card knowledge", "done"),
+            RequestTraceStep("compose", "Compose prompt", "done"),
+            RequestTraceStep("model", "Call model", model_status),
+        ),
+    )
