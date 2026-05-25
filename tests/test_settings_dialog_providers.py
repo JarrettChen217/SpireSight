@@ -92,3 +92,16 @@ def test_apply_persists_image_policy(qtbot, tmp_path):
     dlg._image_policy.setCurrentIndex(idx)
     dlg._apply_and_accept()
     assert cfg.image_policy == "once_only"
+
+
+def test_apply_persists_knowledge_gateway_mode(qtbot, tmp_path):
+    from spiresight.ui.windows.settings_dialog import SettingsDialog
+    cfg = _config(tmp_path)
+    cfg.knowledge_gateway_mode = "auto"
+    store = __import__("unittest.mock").mock.MagicMock(spec=ConfigStore)
+    dlg = SettingsDialog(cfg, store, _locale())
+    qtbot.addWidget(dlg)
+    idx = dlg._knowledge_gateway.findData("off")
+    dlg._knowledge_gateway.setCurrentIndex(idx)
+    dlg._apply_and_accept()
+    assert cfg.knowledge_gateway_mode == "off"

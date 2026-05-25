@@ -46,4 +46,5 @@ class AppConfig(BaseSettings):
     include_screenshot_default: bool = False
     quick_action_clear_context: bool = True
     image_policy: Literal["full", "latest_only", "once_only", "never"] = "latest_only"
+    knowledge_gateway_mode: Literal["auto", "on", "off"] = "auto"
     request_timeout_seconds: int = 180

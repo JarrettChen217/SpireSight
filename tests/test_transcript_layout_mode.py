@@ -60,3 +60,24 @@ def test_transcript_mode_switch_updates_existing_outputs(qtwidgets_app):
     t.set_transcript_mode("expanded")
     for out in outputs:
         assert out.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+
+
+def test_transcript_inserts_trace_before_assistant_output(qtwidgets_app):
+    from spiresight.core.request_trace import RequestTrace, RequestTraceStep
+    from spiresight.ui.widgets.request_trace_widget import RequestTraceWidget
+    import time
+
+    t = ConversationTranscript()
+    trace = RequestTrace(
+        started_at=time.monotonic(),
+        finished_at=None,
+        summary="Compose prompt",
+        steps=(RequestTraceStep("compose", "Compose prompt", "running"),),
+    )
+    t.append_user_message("q")
+    t.begin_assistant_turn(trace=trace)
+    traces = t.findChildren(RequestTraceWidget)
+    outputs = t.findChildren(OutputView)
+    assert traces
+    assert outputs
+    assert traces[0].summary_for_test().startswith("Compose prompt")

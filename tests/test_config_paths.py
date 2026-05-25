@@ -34,3 +34,20 @@ def test_config_dir_linux(monkeypatch):
 def test_log_dir(monkeypatch, tmp_path):
     monkeypatch.setenv("SPIRESIGHT_CONFIG_DIR", str(tmp_path))
     assert paths.log_dir() == tmp_path / "logs"
+
+
+def test_card_knowledge_dir_defaults_to_repo_data(monkeypatch):
+    monkeypatch.delenv("SPIRESIGHT_CARD_KNOWLEDGE_DIR", raising=False)
+    assert paths.card_knowledge_dir() == paths.repo_root() / "data" / "sts2_cards"
+
+
+def test_card_knowledge_dir_uses_env_override(monkeypatch, tmp_path):
+    monkeypatch.setenv("SPIRESIGHT_CARD_KNOWLEDGE_DIR", str(tmp_path))
+    assert paths.card_knowledge_dir() == tmp_path
+
+
+def test_card_knowledge_dir_uses_pyinstaller_bundle(monkeypatch, tmp_path):
+    monkeypatch.delenv("SPIRESIGHT_CARD_KNOWLEDGE_DIR", raising=False)
+    monkeypatch.setattr(paths.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(paths.sys, "_MEIPASS", str(tmp_path), raising=False)
+    assert paths.card_knowledge_dir() == tmp_path / "data" / "sts2_cards"

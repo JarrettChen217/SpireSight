@@ -179,6 +179,62 @@ def test_run_appends_run_state_block_to_system_when_store_has_state(qapp):
     assert "lean strength" in provider.last_call["system"]
 
 
+def test_quick_action_snapshot_appends_knowledge_after_run_state(qapp):
+    from spiresight.knowledge.card_store import CardKnowledgeStore
+    from spiresight.knowledge.gateway import KnowledgeGateway
+    from spiresight.knowledge.models import CardKnowledge
+
+    qa = QuickAction(id="card_selection", label="Cards", system_prompt_id="s",
+                     user_template="Pick Deflect. {custom_text}", requires_screenshot=False,
+                     required_capabilities=[])
+    sp = SystemPrompt(id="s", description="", content="base prompt")
+    provider = _FakeProvider(
+        models=[ModelInfo("gpt-4o", "gpt-4o", frozenset(), 128_000)],
+        chunks=[],
+    )
+    store = RunStateStore()
+    store.set(RunState(
+        cards=[Card(name="Strike", count=4, rarity="starter", usefulness="skip")],
+        relics=[], potions=[], archetype_candidates=[],
+        overall_eval="needs defense",
+        inspected_at=datetime(2026, 5, 16, tzinfo=timezone.utc),
+    ))
+    knowledge = CardKnowledgeStore(cards=(
+        CardKnowledge(
+            id="deflect",
+            name_en="Deflect",
+            aliases=[],
+            character="Silent",
+            rarity="common",
+            card_type="skill",
+            cost="0",
+            description="Gain 4 Block.",
+            upgraded_description="Gain 7 Block.",
+            mechanics=["block"],
+            source_name="wiki.gg",
+            source_url="https://example.test/Deflect",
+            fetched_at=datetime(2026, 5, 24, tzinfo=timezone.utc),
+        ),
+    ))
+    cfg = AppConfig(active_provider="openai", active_model="gpt-4o")
+    cfg.providers["openai"] = ProviderConfig(api_key="sk-x")
+    runner = InferenceRunner(
+        config=cfg,
+        prompt_loader=_FakeLoader(qa, sp),
+        provider_factory=lambda name, pcfg, opts=None: provider,
+        screen_capture=_FakeCapture(),
+        run_state_store=store,
+        knowledge_gateway=KnowledgeGateway(knowledge),
+    )
+    snap = runner.snapshot_quick_action(QuickActionRequest("card_selection", "", False))
+    assert snap.system.index("## Current Run Context") < snap.system.index("## Card Knowledge Context")
+    assert "Gain 4 Block." in snap.system
+    assert snap.params["knowledge_gateway"] == "auto"
+    assert snap.params["knowledge_injected"] is True
+    assert snap.params["knowledge_status"] == "hit"
+    assert snap.params["knowledge_hits"] == ["Deflect"]
+
+
 def test_run_leaves_system_unchanged_when_store_empty(qapp):
     qa = QuickAction(id="x", label="X", system_prompt_id="s",
                      user_template="t", requires_screenshot=False,

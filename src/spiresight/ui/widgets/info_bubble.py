@@ -201,6 +201,9 @@ class InfoBubble(QWidget):
     def begin_assistant_turn(self) -> None:
         self._transcript.begin_assistant_turn()
 
+    def update_trace(self, trace) -> None:
+        self._transcript.update_trace(trace)
+
     def append_delta(self, text: str) -> None:
         self._transcript.append_delta(text)
 

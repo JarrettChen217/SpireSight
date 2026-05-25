@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from spiresight.capture.screen import ScreenCapture
+from spiresight.config import paths
 from spiresight.config.schema import AppConfig
 from spiresight.config.store import ConfigStore
 from spiresight.core.inspect_session import InspectSession
@@ -34,6 +35,8 @@ from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import (
     AuthError, MissingAPIKey, MissingCapabilityError, NetworkError, RateLimitError,
 )
+from spiresight.knowledge.card_store import CardKnowledgeStore
+from spiresight.knowledge.gateway import KnowledgeGateway
 from spiresight.prompts.loader import PromptLoader
 from spiresight.prompts.ui_locale import UILocale
 from spiresight.ui.state.history_store import HistoryEntry, HistoryStore
@@ -85,6 +88,9 @@ class MainWindow(QMainWindow):
         self._history_store = HistoryStore(self)
         self._screenshot_store = ScreenshotStore(self)
         self._inspect_session = InspectSession(self)
+        self._knowledge_gateway = KnowledgeGateway(
+            CardKnowledgeStore.from_dir(paths.card_knowledge_dir())
+        )
         self._ui_locale = UILocale(
             self._loader._root / "locales", self._config.language, parent=self
         )
@@ -580,6 +586,7 @@ class MainWindow(QMainWindow):
             provider_factory=registry.make_provider,
             screen_capture=_PrecapturedScreen(screenshot_png) if screenshot_png else self._capture,
             run_state_store=self._run_state_store,
+            knowledge_gateway=self._knowledge_gateway,
         )
 
         try:
@@ -685,6 +692,7 @@ class MainWindow(QMainWindow):
             provider_factory=registry.make_provider,
             screen_capture=_PrecapturedScreen(screenshot_png) if screenshot_png else self._capture,
             run_state_store=self._run_state_store,
+            knowledge_gateway=self._knowledge_gateway,
         )
         self._tabs.setCurrentIndex(_TAB_CHAT)
         self._chat_tab.reset()
@@ -722,6 +730,13 @@ class MainWindow(QMainWindow):
         worker.cancelled.connect(self._on_inference_cancelled)
         worker.request_logged.connect(self._logs_tab.log_request)
         worker.response_logged.connect(self._logs_tab.update_response)
+        worker.trace_updated.connect(self._on_trace_updated)
+
+    def _on_trace_updated(self, trace) -> None:
+        if self._config.mini_bar_mode and self._bubble is not None:
+            self._bubble.update_trace(trace)
+        else:
+            self._chat_tab.update_trace(trace)
 
     def _on_stop(self) -> None:
         if self._worker is not None:
@@ -848,6 +863,7 @@ class MainWindow(QMainWindow):
             provider_factory=registry.make_provider,
             screen_capture=_PrecapturedScreen(screenshot_png) if screenshot_png else self._capture,
             run_state_store=self._run_state_store,
+            knowledge_gateway=self._knowledge_gateway,
         )
 
         snap = runner.snapshot_follow_up(request, history)

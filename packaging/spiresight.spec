@@ -22,6 +22,7 @@ APP_ICON = ICON_ICNS if sys.platform == "darwin" else ICON_ICO
 
 datas = [
     (os.path.join(ROOT, "prompts"), "prompts"),
+    (os.path.join(ROOT, "data", "sts2_cards"), "data/sts2_cards"),
     (os.path.join(ROOT, "src", "spiresight", "resources"), "spiresight/resources"),
     (os.path.join(ROOT, "src", "spiresight", "ui", "markdown", "style.css"),
      "spiresight/ui/markdown"),

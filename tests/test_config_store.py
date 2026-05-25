@@ -98,3 +98,12 @@ def test_app_config_legacy_file_uses_defaults(tmp_path):
     cfg = ConfigStore(path).load()
     assert cfg.bubble_width == 360
     assert cfg.bubble_height == 280
+    assert cfg.knowledge_gateway_mode == "auto"
+
+
+def test_app_config_accepts_knowledge_gateway_modes():
+    from spiresight.config.schema import AppConfig
+
+    assert AppConfig(knowledge_gateway_mode="auto").knowledge_gateway_mode == "auto"
+    assert AppConfig(knowledge_gateway_mode="on").knowledge_gateway_mode == "on"
+    assert AppConfig(knowledge_gateway_mode="off").knowledge_gateway_mode == "off"

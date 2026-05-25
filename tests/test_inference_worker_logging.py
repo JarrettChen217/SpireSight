@@ -56,6 +56,20 @@ def test_response_logged_on_success(qtbot):
     assert err is None
 
 
+def test_trace_updated_emits_running_and_done(qtbot):
+    def run_fn(cancel):
+        yield StreamChunk(text_delta="hello", finish_reason="stop")
+
+    w = _make_worker(run_fn)
+    traces = []
+    w.trace_updated.connect(traces.append)
+    w.run()
+    assert traces[0].summary == "Call model"
+    assert traces[0].finished_at is None
+    assert traces[-1].finished_at is not None
+    assert traces[-1].steps[-1].status == "done"
+
+
 def test_response_logged_on_timeout(qtbot):
     def run_fn(cancel):
         yield StreamChunk(text_delta="partial")

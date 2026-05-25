@@ -27,6 +27,7 @@ from spiresight.llm.capabilities import Capability
 from spiresight.llm.errors import MissingAPIKey, MissingCapabilityError
 from spiresight.llm.models import ModelInfo
 from spiresight.llm.provider import LLMProvider, ProviderOptions, StreamChunk
+from spiresight.knowledge.gateway import KnowledgeGateway
 from spiresight.prompts.loader import PromptLoader
 
 _log = logging.getLogger(__name__)
@@ -99,12 +100,14 @@ class InferenceRunner:
         provider_factory: ProviderFactory,
         screen_capture: CaptureSource,
         run_state_store: RunStateSource | None = None,
+        knowledge_gateway: KnowledgeGateway | None = None,
     ) -> None:
         self._config = config
         self._loader = prompt_loader
         self._factory = provider_factory
         self._capture = screen_capture
         self._store = run_state_store
+        self._knowledge_gateway = knowledge_gateway
 
     def _compose_system(self, base: str) -> str:
         if self._store is None:
@@ -144,12 +147,38 @@ class InferenceRunner:
         user_msg = Message(role="user", text=user_text, image_png=image_png)
         messages = (*history, user_msg) if history else (user_msg,)
         provider, model = self._get_provider_and_model()
+        system = self._compose_system(sp.content)
+        knowledge_params: dict[str, object] = {
+            "knowledge_gateway": self._config.knowledge_gateway_mode,
+            "knowledge_injected": False,
+            "knowledge_status": "skipped",
+            "knowledge_hits": [],
+        }
+        if self._knowledge_gateway is not None:
+            result = self._knowledge_gateway.evaluate(
+                action_id=qa.id,
+                mode=self._config.knowledge_gateway_mode,
+                user_text=user_text,
+            )
+            knowledge_params.update(
+                {
+                    "knowledge_injected": result.injected,
+                    "knowledge_status": result.status,
+                    "knowledge_hits": result.hits,
+                }
+            )
+            if result.injected:
+                system = f"{system}\n\n{result.prompt_block}"
         return RequestSnapshot(
             provider=provider.name,
             model=model.id,
-            system=self._compose_system(sp.content),
+            system=system,
             messages=messages,
-            params={"json_mode": False, "has_images": image_png is not None},
+            params={
+                "json_mode": False,
+                "has_images": image_png is not None,
+                **knowledge_params,
+            },
         )
 
     def snapshot_follow_up(

@@ -96,6 +96,11 @@ settings:
   image_policy_latest_only: "仅最新一张（推荐）"
   image_policy_once_only: "仅首轮带图"
   image_policy_never: "从不发图（仅文本与对局状态）"
+  knowledge_gateway: "卡牌知识网关"
+  knowledge_gateway_tip: "控制选牌建议是否向 prompt 注入本地缓存的卡牌信息。"
+  knowledge_gateway_auto: "自动（仅选牌建议）"
+  knowledge_gateway_on: "开启（选牌建议始终尝试）"
+  knowledge_gateway_off: "关闭"
 
 usage:
   tooltip:

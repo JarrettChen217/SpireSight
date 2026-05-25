@@ -96,6 +96,11 @@ settings:
   image_policy_latest_only: "Latest only (recommended)"
   image_policy_once_only: "First turn only"
   image_policy_never: "Never (text + run state only)"
+  knowledge_gateway: "Card knowledge gateway"
+  knowledge_gateway_tip: "Controls whether card selection injects local cached card facts into the prompt."
+  knowledge_gateway_auto: "Auto (card selection only)"
+  knowledge_gateway_on: "On (always for card selection)"
+  knowledge_gateway_off: "Off"
 
 usage:
   tooltip:
